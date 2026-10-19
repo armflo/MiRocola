@@ -24,6 +24,16 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   const [roomMode, setRoomMode] = useState<RoomMode>('COLLABORATIVE');
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
 
+  // Read ?code=... or ?join=... from URL (e.g. from QR scan)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const codeParam = params.get('code') || params.get('join');
+    if (codeParam) {
+      setRoomCode(codeParam.toUpperCase().trim());
+      setTab('join');
+    }
+  }, []);
+
   const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedAvatarSeed}`;
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import {
+  Play,
+  Pause,
+  SkipForward,
+  Music,
+  ListMusic,
+  MessageSquare,
+  Plus
+} from 'lucide-react';
 import type {
   RoomState,
   User,
@@ -10,6 +19,7 @@ import type {
   RoomSettings
 } from '@mirocola/shared';
 import { socket } from './services/socket';
+import { THEMES } from './lib/theme';
 import { Navbar } from './components/Navbar';
 import { RoomLobby } from './components/RoomLobby';
 import { YouTubeSyncPlayer } from './components/YouTubeSyncPlayer';
@@ -18,6 +28,7 @@ import { RoomChat } from './components/RoomChat';
 import { AddSongModal } from './components/AddSongModal';
 import { UserListModal } from './components/UserListModal';
 import { RoomSettingsModal } from './components/RoomSettingsModal';
+import { QRCodeModal } from './components/QRCodeModal';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -31,7 +42,10 @@ export const App: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [activeTabMobile, setActiveTabMobile] = useState<'queue' | 'chat'>('queue');
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
+  // Mobile navigation tab: 'player' | 'queue' | 'chat'
+  const [mobileTab, setMobileTab] = useState<'player' | 'queue' | 'chat'>('player');
 
   // Socket event listeners
   useEffect(() => {
@@ -269,22 +283,33 @@ export const App: React.FC = () => {
   }
 
   const isHost = currentUser?.isHost ?? false;
+  const canControl = room.mode === 'COLLABORATIVE' || isHost;
+  const currentSong = room.playback.currentSong;
+  const currentTheme = THEMES[room.settings?.theme || 'neon'];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div
+      className={`min-h-screen text-slate-100 flex flex-col transition-colors duration-500 pb-20 lg:pb-0`}
+      style={{ backgroundColor: currentTheme.bgDark }}
+    >
       {/* Top Navigation */}
       <Navbar
         room={room}
         currentUser={currentUser}
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenQR={() => setIsQRModalOpen(true)}
         onLeaveRoom={handleLeaveRoom}
       />
 
       {/* Main Room Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Player & Stage (7 cols on lg) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+        {/* Left / Primary Column: Player & Stage (7 cols on desktop) */}
+        <div
+          className={`lg:col-span-7 flex flex-col gap-6 ${
+            mobileTab === 'player' ? 'block' : 'hidden lg:flex'
+          }`}
+        >
           <YouTubeSyncPlayer
             playback={room.playback}
             currentUser={currentUser}
@@ -299,60 +324,20 @@ export const App: React.FC = () => {
             onVoteSkip={handleVoteSkip}
             onOpenAddModal={() => setIsAddModalOpen(true)}
           />
-
-          {/* Mobile Tab Switcher (Queue vs Chat) */}
-          <div className="flex lg:hidden grid-cols-2 p-1 bg-slate-900 rounded-xl border border-purple-900/40">
-            <button
-              onClick={() => setActiveTabMobile('queue')}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                activeTabMobile === 'queue'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-slate-400'
-              }`}
-            >
-              Cola ({room.queue.length})
-            </button>
-            <button
-              onClick={() => setActiveTabMobile('chat')}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                activeTabMobile === 'chat'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-slate-400'
-              }`}
-            >
-              Chat de la Sala
-            </button>
-          </div>
-
-          {/* On Mobile, show either queue or chat based on tab */}
-          <div className="block lg:hidden">
-            {activeTabMobile === 'queue' ? (
-              <SongQueue
-                queue={room.queue}
-                currentUser={currentUser}
-                roomMode={room.mode}
-                roomSettings={room.settings}
-                isHost={isHost}
-                onUpvote={handleUpvoteSong}
-                onRemove={handleRemoveSong}
-                onOpenAddModal={() => setIsAddModalOpen(true)}
-              />
-            ) : (
-              <RoomChat
-                messages={messages}
-                reactions={reactions}
-                currentUser={currentUser}
-                onSendMessage={handleSendMessage}
-                onSendReaction={handleSendReaction}
-              />
-            )}
-          </div>
         </div>
 
-        {/* Right Column: Queue & Chat (Desktop only, 5 cols on lg) */}
-        <div className="hidden lg:flex lg:col-span-5 flex-col gap-6">
-          {/* Queue in top half */}
-          <div className="flex-1">
+        {/* Right Column: Queue & Chat (Desktop only, or Mobile Tab switcher) */}
+        <div
+          className={`lg:col-span-5 flex-col gap-6 ${
+            mobileTab !== 'player' ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
+          {/* Queue Tab / Section */}
+          <div
+            className={`flex-1 ${
+              mobileTab === 'queue' ? 'block' : 'hidden lg:block'
+            }`}
+          >
             <SongQueue
               queue={room.queue}
               currentUser={currentUser}
@@ -365,8 +350,12 @@ export const App: React.FC = () => {
             />
           </div>
 
-          {/* Chat in bottom half */}
-          <div className="h-[340px]">
+          {/* Chat Tab / Section */}
+          <div
+            className={`h-[420px] lg:h-[340px] ${
+              mobileTab === 'chat' ? 'block' : 'hidden lg:block'
+            }`}
+          >
             <RoomChat
               messages={messages}
               reactions={reactions}
@@ -377,6 +366,115 @@ export const App: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Mobile Persistent Mini-Player Bar (Shown when mobile user is on Queue or Chat tab) */}
+      {mobileTab !== 'player' && currentSong && (
+        <div className="lg:hidden fixed bottom-16 inset-x-3 z-30 bg-slate-900/95 border border-purple-800/60 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 animate-fade-in">
+          <button
+            onClick={() => setMobileTab('player')}
+            className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer"
+          >
+            <img
+              src={currentSong.thumbnail}
+              alt=""
+              className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-purple-900/40"
+            />
+            <div className="min-w-0 flex-1">
+              <h5 className="text-xs font-bold text-white truncate">
+                {currentSong.title}
+              </h5>
+              <p className="text-[10px] text-purple-300 truncate">
+                {currentSong.channelTitle}
+              </p>
+            </div>
+          </button>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {canControl && (
+              <button
+                onClick={() => {
+                  if (room.playback.isPlaying) {
+                    handlePause();
+                  } else {
+                    handlePlay();
+                  }
+                }}
+                className="w-8 h-8 rounded-full bg-pink-600 text-white flex items-center justify-center shadow cursor-pointer"
+              >
+                {room.playback.isPlaying ? (
+                  <Pause className="w-4 h-4 fill-current" />
+                ) : (
+                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                )}
+              </button>
+            )}
+
+            {canControl && (
+              <button
+                onClick={handleNext}
+                className="p-1.5 text-slate-300 hover:text-white cursor-pointer"
+                title="Siguiente"
+              >
+                <SkipForward className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation Bar (iOS / Android Style) */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 border-t border-purple-900/40 backdrop-blur-lg px-2 py-1.5 flex justify-around items-center safe-area-bottom">
+        <button
+          onClick={() => setMobileTab('player')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            mobileTab === 'player'
+              ? 'text-pink-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Music className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Rocola</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('queue')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer relative ${
+            mobileTab === 'queue'
+              ? 'text-pink-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ListMusic className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Cola ({room.queue.length})</span>
+          {room.queue.length > 0 && (
+            <span className="absolute top-0.5 right-3 w-2 h-2 rounded-full bg-pink-500" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setMobileTab('chat')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer relative ${
+            mobileTab === 'chat'
+              ? 'text-pink-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <MessageSquare className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px]">Chat</span>
+          {messages.length > 0 && (
+            <span className="absolute top-0.5 right-3 w-2 h-2 rounded-full bg-purple-500" />
+          )}
+        </button>
+
+        {/* Floating Add Song Trigger Button on Mobile */}
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/30 cursor-pointer active:scale-95 transition-transform"
+          title="Pedir Canción"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </nav>
 
       {/* Add Song Modal */}
       <AddSongModal
@@ -392,6 +490,14 @@ export const App: React.FC = () => {
         onClose={() => setIsUsersModalOpen(false)}
         users={room.users}
         currentUserId={currentUser?.id}
+      />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        roomCode={room.code}
+        roomName={room.name}
       />
 
       {/* Room Settings Modal (Host only) */}

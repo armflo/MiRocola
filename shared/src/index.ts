@@ -1,6 +1,9 @@
 export type RoomMode = 'COLLABORATIVE' | 'DJ_ONLY';
 
+export type RoomTheme = 'neon' | 'retro' | 'emerald' | 'midnight' | 'sunset';
+
 export interface RoomSettings {
+  theme: RoomTheme;
   maxSongDurationSeconds: number; // 0 = unlimited, e.g. 600 (10 mins)
   maxSongsPerUserInQueue: number; // 0 = unlimited, e.g. 3
   preventConsecutiveUserSongs: boolean; // true = cannot queue twice in a row
@@ -11,6 +14,7 @@ export interface RoomSettings {
 }
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  theme: 'neon',
   maxSongDurationSeconds: 600, // 10 minutes default
   maxSongsPerUserInQueue: 3, // 3 songs max per user default
   preventConsecutiveUserSongs: true, // prevent queue hoarding

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_ROOM_SETTINGS = void 0;
 exports.DEFAULT_ROOM_SETTINGS = {
+    theme: 'neon',
     maxSongDurationSeconds: 600, // 10 minutes default
     maxSongsPerUserInQueue: 3, // 3 songs max per user default
     preventConsecutiveUserSongs: true, // prevent queue hoarding

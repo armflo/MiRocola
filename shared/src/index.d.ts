@@ -1,5 +1,7 @@
 export type RoomMode = 'COLLABORATIVE' | 'DJ_ONLY';
+export type RoomTheme = 'neon' | 'retro' | 'emerald' | 'midnight' | 'sunset';
 export interface RoomSettings {
+    theme: RoomTheme;
     maxSongDurationSeconds: number;
     maxSongsPerUserInQueue: number;
     preventConsecutiveUserSongs: boolean;

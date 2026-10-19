@@ -11,9 +11,11 @@ import {
   Percent,
   ShieldCheck,
   Check,
-  Loader2
+  Loader2,
+  Palette
 } from 'lucide-react';
-import type { RoomSettings, RoomMode } from '@mirocola/shared';
+import type { RoomSettings, RoomMode, RoomTheme } from '@mirocola/shared';
+import { THEMES } from '../lib/theme';
 
 interface RoomSettingsModalProps {
   isOpen: boolean;
@@ -118,6 +120,60 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
         )}
 
         <div className="space-y-5">
+          {/* 0. Color & Design Themes */}
+          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-purple-900/30">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Palette className="w-4 h-4 text-pink-400" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-200">
+                  Estilo y Colores de la Rocola
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Cambia el ambiente visual para todos los que estén en la sala.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+              {Object.values(THEMES).map((th) => {
+                const isSelected = (settings.theme || 'neon') === th.id;
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    onClick={() =>
+                      setSettings((prev) => ({ ...prev, theme: th.id as RoomTheme }))
+                    }
+                    className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-950/90 border-pink-500 shadow-md shadow-pink-500/20'
+                        : 'bg-slate-900/70 border-slate-800 hover:border-purple-800/60'
+                    }`}
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${th.previewGradient} flex items-center justify-center text-base flex-shrink-0 shadow-md`}
+                    >
+                      {th.emoji}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white truncate">
+                          {th.name}
+                        </span>
+                        {isSelected && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-pink-500 text-white font-bold">
+                            Activo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        {th.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {/* 1. Límite de tiempo por canción */}
           <div className="p-3.5 rounded-xl bg-slate-950/60 border border-purple-900/30">
             <div className="flex items-center gap-2 mb-2">
