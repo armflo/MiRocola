@@ -17,45 +17,59 @@ MiRocola/
 
 ### Backend (Node.js + TypeScript)
 - **Framework & HTTP:** Express con Node.js y TypeScript.
-- **Tiempo Real (WebSockets):** `Socket.IO` con eventos fuertemente tipados (`room:sync`, `playback:sync`, `queue:update`, `chat:message`, `reaction:new`, `skip:update`, `room:settingsUpdated`).
+- **Tiempo Real (WebSockets):** `Socket.IO` con eventos fuertemente tipados (`room:sync`, `playback:sync`, `queue:update`, `chat:message`, `reaction:new`, `soundboard:played`, `room:settingsUpdated`).
 - **Base de Datos & ORM:** **MySQL** (`mirocola_db`) gestionado mediante **Prisma ORM**. Persiste salas y el historial de canciones reproducidas.
 - **Sincronización:** Motor de estado en memoria que compensa la latencia de red mediante marcas de tiempo de servidor y cálculo de deriva (*drift correction*).
-- **Extracción Multimedia:** Servicio de metadatos de YouTube con extracción precisa de duración sin requerir API key obligatoria (vía scraping inicial + oEmbed).
+- **Extracción & Búsqueda Multimedia:** Búsqueda integrada de YouTube ultrarrápida sin requerir API keys obligatorias (con fallback a YouTube Data API v3).
 - **Reglas Anti-Spam y Moderación en Tiempo Real:** Validación estricta de duración, turnos no consecutivos, límites por usuario y bloqueo de listas enteras.
 
 ### Frontend (React + Vite + TypeScript)
 - **Vite + React 19** con soporte para componentes modernos.
-- **Tailwind CSS v4** con diseño *Dark Neon Rocola*, animaciones de vinilo giratorio y efectos de brillo.
+- **Tailwind CSS v4** con selector de 5 temas dinámicos (Cyber Neon, Rocola 80s Gold, Club Esmeralda, Medianoche Océano, Atardecer Fiesta).
 - **YouTube Iframe Player API:** Reproductor sincronizado que maneja reproducción, pausa, salto a tiempo específico (*seek*) y volumen local.
-- **Modos de Visualización:** Alterna entre ver el video oficial de YouTube o el **Modo Fiesta / Vinilo**, donde se muestra un disco de acetato con la portada del tema.
-- **Sistema de Cola & Votación:** Los participantes pueden pedir canciones y votar con 🔥 para que sus temas favoritos suban en la lista.
-- **Voto para Saltar (Vote Skip):** Si a la mayoría no le gusta la canción actual (> 50% de votos), se pasa a la siguiente automáticamente.
-- **Chat & Reacciones en Vivo:** Mensajes de chat y emojis flotantes con lluvia de confeti (🎉, 🔥, 🍻).
-- **Panel de Ajustes para el Anfitrión (⚙️):** Modal exclusivo para el creador de la sala para configurar reglas en vivo.
+- **Buscador Integrado de YouTube:** Búsqueda por palabras clave con resultados instantáneos (carátulas, duración y canal) para agregar canciones con 1 clic.
+- **Botonera DJ (Soundboard) en Tiempo Real:** Sonidos sintetizados con Web Audio API (Airhorn 🎺, Aplausos 👏, Scratch de vinilo 🎚️, Sirena 🚨, Ba-Dum-Tss 🥁) que suenan en los teléfonos de todos sincronizados.
+- **Diseño Responsivo Completo para Móviles:** Barra inferior estilo app móvil (Rocola, Cola, Chat), mini-reproductor persistente y botón flotante (+).
+- **Invitación Rápida con Código QR:** Escaneo directo desde la cámara del celular para unirse al instante con el código precargado.
+
+---
+
+## 🔍 Buscador de YouTube Integrado
+
+En el modal de **Pedir Tema**, los usuarios ya no necesitan salir de la aplicación:
+1. Escribe el nombre de la canción o artista (ej. *"Soda Stereo De Musica Ligera"*).
+2. Presiona **Buscar** o Enter.
+3. Se despliegan los resultados con carátula, duración y canal.
+4. Presiona **Pedir** para enviarla inmediatamente a la cola de reproducción.
+*(Si pegas un enlace directo `https://youtube.com/watch?v=...`, también lo detecta y lo agrega al instante).*
+
+---
+
+## 📢 Soundboard DJ & Efectos en Vivo
+
+Panel con efectos de sonido de alta fidelidad que suenan instantáneamente en los dispositivos de todos los amigos conectados en la sala:
+- 🎺 **Bocina DJ (Airhorn):** El clásico toque jamaiquino de discoteca.
+- 👏 **Aplausos:** Ovación del público.
+- 🎚️ **Scratch de Vinilo:** Efecto de retroceso de tocadiscos hip-hop.
+- 🚨 **Sirena de Fiesta:** Alarma festiva para momentos cumbre.
+- 🥁 **Ba-Dum-Tss:** Redoble de comedia tras un comentario en el chat.
+*(Incluye botón de Mute local para silenciar solo los efectos si así lo deseas).*
 
 ---
 
 ## ⚙️ Panel de Configuraciones del Anfitrión
 
-El creador de la sala (o quien reciba la corona de DJ) tiene acceso a un botón de ajustes (**⚙️**) en la barra de navegación para controlar las siguientes reglas:
+El creador de la sala (o quien reciba la corona de DJ) tiene acceso a un botón de ajustes (**⚙️**) en la barra de navegación para controlar:
 
-1. **⏱️ Límite de Duración de Cada Canción:**
-   - Opciones: 3 min, 5 min, 8 min, 10 min, 15 min, 20 min o Sin límite.
-   - Si alguien intenta encolar un mix de 1 hora o un video que exceda el límite, el servidor lo rechaza informando la duración exacta y el límite permitido.
-2. **🚫 Prohibición de Listas de Reproducción Completas:**
-   - Se rechazan enlaces a playlists enteras (`youtube.com/playlist?list=...`) exigiendo canciones individuales para no saturar la rocola.
-3. **🔀 Evitar Canciones Consecutivas del Mismo Usuario:**
-   - Si está activo, una persona no puede encolar dos canciones seguidas si hay más amigos en la sala, garantizando que todos tengan turno.
-4. **🎯 Límite de Canciones por Usuario en la Cola:**
-   - Opciones: 1, 2, 3, 5 o Sin límite de canciones activas por persona en espera.
-5. **🔂 Bloqueo de Canciones Duplicadas:**
-   - Evita que se encole una canción que ya esté sonando o que ya se encuentre esperando en la cola.
-6. **🔒 Cerrar / Bloquear Pedidos (Pausar Rocola):**
-   - El anfitrión puede congelar la cola de pedidos temporalmente cuando no desee que se agreguen más temas.
-7. **📊 Porcentaje para Saltar Canción:**
-   - Modifica el porcentaje requerido de votos para saltar un tema (30%, 50%, 66% o 75%).
-8. **👑 Modo de Control:**
-   - Cambiar en cualquier momento entre **Colaborativo** (todos pueden pausar/reproducir) y **Modo DJ** (solo el anfitrión manipula el reproductor).
+1. **🎨 Estilos y Colores de la Sala:** 5 paletas de color que se aplican a todos los integrantes en vivo.
+2. **⏱️ Límite de Duración de Cada Canción:** 3, 5, 8, 10, 15, 20 min o Sin límite.
+3. **🚫 Prohibición de Listas de Reproducción Completas:** Rechazo de playlists completas para cuidar la cola.
+4. **🔀 Evitar Canciones Consecutivas del Mismo Usuario:** Garantiza turnos alternados entre amigos.
+5. **🎯 Límite de Canciones por Usuario en Cola:** 1, 2, 3, 5 o Sin límite.
+6. **🔂 Bloqueo de Canciones Duplicadas:** Evita repetir temas activos.
+7. **🔒 Cerrar / Bloquear Pedidos (Pausar Rocola):** Congelar la cola temporalmente.
+8. **📊 Porcentaje para Saltar Canción:** 30%, 50%, 66% o 75%.
+9. **👑 Modo de Control:** Alternar entre Colaborativo y Modo DJ.
 
 ---
 
