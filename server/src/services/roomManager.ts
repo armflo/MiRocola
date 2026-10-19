@@ -89,6 +89,7 @@ export class RoomManager {
         playbackRate: 1
       },
       queue: [],
+      history: [],
       users: [user],
       skipVotes: [],
       requiredSkipVotes: 1
@@ -446,6 +447,14 @@ export class RoomManager {
     }
 
     room.skipVotes = [];
+
+    // Save previous playing song to room's played history
+    if (room.playback.currentSong) {
+      room.history.unshift({ ...room.playback.currentSong });
+      if (room.history.length > 50) {
+        room.history.pop();
+      }
+    }
 
     if (room.queue.length > 0) {
       const next = room.queue.shift()!;

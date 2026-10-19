@@ -119,6 +119,7 @@ export function setupSocketHandlers(io: TypedServer) {
         const room = roomManager.nextSong(roomCode, userId);
         io.to(roomCode).emit('playback:sync', room.playback);
         io.to(roomCode).emit('queue:update', room.queue);
+        io.to(roomCode).emit('history:update', room.history);
         io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
       } catch (err: any) {
         socket.emit('room:error', err.message);
@@ -184,6 +185,7 @@ export function setupSocketHandlers(io: TypedServer) {
         if (skipped) {
           io.to(roomCode).emit('playback:sync', room.playback);
           io.to(roomCode).emit('queue:update', room.queue);
+          io.to(roomCode).emit('history:update', room.history);
           io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
 
           const skipMsg: ChatMessage = {

@@ -48,6 +48,7 @@ export interface RoomState {
     settings: RoomSettings;
     playback: PlaybackState;
     queue: Song[];
+    history: Song[];
     users: User[];
     skipVotes: string[];
     requiredSkipVotes: number;
@@ -97,6 +98,7 @@ export interface ServerToClientEvents {
     'room:settingsUpdated': (settings: RoomSettings) => void;
     'playback:sync': (playback: PlaybackState) => void;
     'queue:update': (queue: Song[]) => void;
+    'history:update': (history: Song[]) => void;
     'users:update': (users: User[]) => void;
     'chat:message': (message: ChatMessage) => void;
     'reaction:new': (reaction: ReactionEvent) => void;

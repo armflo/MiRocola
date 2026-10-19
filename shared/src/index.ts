@@ -64,6 +64,7 @@ export interface RoomState {
   settings: RoomSettings;
   playback: PlaybackState;
   queue: Song[];
+  history: Song[]; // List of already played songs
   users: User[];
   skipVotes: string[]; // user IDs who voted to skip current song
   requiredSkipVotes: number;
@@ -120,6 +121,7 @@ export interface ServerToClientEvents {
   'room:settingsUpdated': (settings: RoomSettings) => void;
   'playback:sync': (playback: PlaybackState) => void;
   'queue:update': (queue: Song[]) => void;
+  'history:update': (history: Song[]) => void;
   'users:update': (users: User[]) => void;
   'chat:message': (message: ChatMessage) => void;
   'reaction:new': (reaction: ReactionEvent) => void;

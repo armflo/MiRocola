@@ -70,6 +70,10 @@ export const App: React.FC = () => {
       setRoom((prev) => (prev ? { ...prev, queue } : prev));
     }
 
+    function onHistoryUpdate(history: Song[]) {
+      setRoom((prev) => (prev ? { ...prev, history } : prev));
+    }
+
     function onUsersUpdate(users: User[]) {
       setRoom((prev) => (prev ? { ...prev, users } : prev));
     }
@@ -128,6 +132,7 @@ export const App: React.FC = () => {
     socket.on('room:sync', onRoomSync);
     socket.on('playback:sync', onPlaybackSync);
     socket.on('queue:update', onQueueUpdate);
+    socket.on('history:update', onHistoryUpdate);
     socket.on('users:update', onUsersUpdate);
     socket.on('skip:update', onSkipUpdate);
     socket.on('room:settingsUpdated', onSettingsUpdated);
@@ -141,6 +146,7 @@ export const App: React.FC = () => {
       socket.off('room:sync', onRoomSync);
       socket.off('playback:sync', onPlaybackSync);
       socket.off('queue:update', onQueueUpdate);
+      socket.off('history:update', onHistoryUpdate);
       socket.off('users:update', onUsersUpdate);
       socket.off('skip:update', onSkipUpdate);
       socket.off('room:settingsUpdated', onSettingsUpdated);
@@ -408,6 +414,7 @@ export const App: React.FC = () => {
           >
             <SongQueue
               queue={room.queue}
+              history={room.history || []}
               currentUser={currentUser}
               roomMode={room.mode}
               roomSettings={room.settings}
@@ -415,6 +422,7 @@ export const App: React.FC = () => {
               onUpvote={handleUpvoteSong}
               onRemove={handleRemoveSong}
               onOpenAddModal={() => setIsAddModalOpen(true)}
+              onAddSong={handleAddSong}
             />
           </div>
 
