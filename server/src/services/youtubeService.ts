@@ -1,3 +1,5 @@
+import type { YouTubeSearchResult } from '@mirocola/shared';
+
 export interface YouTubeMeta {
   youtubeId: string;
   url: string;
@@ -194,6 +196,100 @@ export class YouTubeService {
     }
 
     throw new Error('Por favor ingresa un enlace válido de YouTube (ej. https://youtube.com/watch?v=...)');
+  }
+
+  /**
+   * Search multiple videos on YouTube with thumbnails, duration and titles
+   */
+  static async searchVideos(query: string, limit = 6): Promise<YouTubeSearchResult[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    // 1. YouTube Data API v3 if API key available
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (apiKey) {
+      try {
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?q=${encodeURIComponent(
+          trimmed
+        )}&part=snippet&type=video&maxResults=${limit}&key=${apiKey}`;
+        const res = await fetch(searchUrl);
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (data.items && data.items.length > 0) {
+            return data.items.map((item: any) => ({
+              youtubeId: item.id.videoId,
+              url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+              title: item.snippet.title,
+              channelTitle: item.snippet.channelTitle,
+              durationSeconds: 0,
+              durationFormatted: '',
+              thumbnail:
+                item.snippet.thumbnails?.medium?.url ||
+                item.snippet.thumbnails?.high?.url ||
+                `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('[YouTubeService] API search failed, falling back to scraper:', err);
+      }
+    }
+
+    // 2. High-speed scraper fallback (no API key needed!)
+    try {
+      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmed)}`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+        }
+      });
+      const html = await res.text();
+      const match = html.match(/ytInitialData\s*=\s*({.+?});<\/script>/);
+      if (match && match[1]) {
+        const data = JSON.parse(match[1]);
+        const contents =
+          data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
+        const itemSection = contents?.find((c: any) => c.itemSectionRenderer)?.itemSectionRenderer?.contents;
+        const videoRenderers =
+          itemSection?.filter((i: any) => i.videoRenderer).map((i: any) => i.videoRenderer) || [];
+
+        const results: YouTubeSearchResult[] = [];
+
+        for (const v of videoRenderers.slice(0, limit)) {
+          if (!v.videoId) continue;
+          const durationStr = v.lengthText?.simpleText || '';
+          let durationSec = 0;
+          if (durationStr) {
+            const parts = durationStr.split(':').map((p: string) => parseInt(p, 10));
+            if (parts.length === 2) {
+              durationSec = parts[0] * 60 + parts[1];
+            } else if (parts.length === 3) {
+              durationSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+            }
+          }
+
+          results.push({
+            youtubeId: v.videoId,
+            url: `https://www.youtube.com/watch?v=${v.videoId}`,
+            title: v.title?.runs?.[0]?.text || 'Video de YouTube',
+            channelTitle: v.ownerText?.runs?.[0]?.text || 'YouTube',
+            durationSeconds: durationSec,
+            durationFormatted: durationStr,
+            thumbnail:
+              v.thumbnail?.thumbnails?.[0]?.url ||
+              `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`
+          });
+        }
+
+        return results;
+      }
+    } catch (err) {
+      console.error('[YouTubeService] Scraper search failed:', err);
+    }
+
+    return [];
   }
 
   /**

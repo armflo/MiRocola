@@ -16,10 +16,14 @@ import type {
   ReactionEvent,
   RoomMode,
   Song,
-  RoomSettings
+  RoomSettings,
+  SoundEffectId,
+  SoundboardEvent,
+  YouTubeSearchResult
 } from '@mirocola/shared';
 import { socket } from './services/socket';
 import { THEMES } from './lib/theme';
+import { playSoundEffect, SOUND_EFFECTS } from './lib/soundboard';
 import { Navbar } from './components/Navbar';
 import { RoomLobby } from './components/RoomLobby';
 import { YouTubeSyncPlayer } from './components/YouTubeSyncPlayer';
@@ -29,6 +33,7 @@ import { AddSongModal } from './components/AddSongModal';
 import { UserListModal } from './components/UserListModal';
 import { RoomSettingsModal } from './components/RoomSettingsModal';
 import { QRCodeModal } from './components/QRCodeModal';
+import { Soundboard } from './components/Soundboard';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -43,6 +48,10 @@ export const App: React.FC = () => {
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
+  // Soundboard state
+  const [isSoundboardMuted, setIsSoundboardMuted] = useState(false);
+  const [lastSoundEvent, setLastSoundEvent] = useState<SoundboardEvent | null>(null);
 
   // Mobile navigation tab: 'player' | 'queue' | 'chat'
   const [mobileTab, setMobileTab] = useState<'player' | 'queue' | 'chat'>('player');
@@ -95,6 +104,16 @@ export const App: React.FC = () => {
       }
     }
 
+    function onSoundboardPlayed(event: SoundboardEvent) {
+      if (!isSoundboardMuted) {
+        playSoundEffect(event.soundId);
+      }
+      setLastSoundEvent(event);
+      setTimeout(() => {
+        setLastSoundEvent((cur) => (cur?.id === event.id ? null : cur));
+      }, 2400);
+    }
+
     function onHostChanged(newHost: User) {
       setRoom((prev) => (prev ? { ...prev, hostId: newHost.id } : prev));
       setCurrentUser((prev) =>
@@ -114,6 +133,7 @@ export const App: React.FC = () => {
     socket.on('room:settingsUpdated', onSettingsUpdated);
     socket.on('chat:message', onChatMessage);
     socket.on('reaction:new', onNewReaction);
+    socket.on('soundboard:played', onSoundboardPlayed);
     socket.on('host:changed', onHostChanged);
     socket.on('room:error', onRoomError);
 
@@ -126,10 +146,11 @@ export const App: React.FC = () => {
       socket.off('room:settingsUpdated', onSettingsUpdated);
       socket.off('chat:message', onChatMessage);
       socket.off('reaction:new', onNewReaction);
+      socket.off('soundboard:played', onSoundboardPlayed);
       socket.off('host:changed', onHostChanged);
       socket.off('room:error', onRoomError);
     };
-  }, []);
+  }, [isSoundboardMuted]);
 
   // 1. Create Room handler
   const handleCreateRoom = (
@@ -229,6 +250,18 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleSearchYouTube = async (query: string): Promise<YouTubeSearchResult[]> => {
+    return new Promise((resolve) => {
+      socket.emit('youtube:search', query, (res) => {
+        if (res.success && res.results) {
+          resolve(res.results);
+        } else {
+          resolve([]);
+        }
+      });
+    });
+  };
+
   const handleRemoveSong = (songId: string) => {
     socket.emit('queue:remove', songId);
   };
@@ -239,6 +272,11 @@ export const App: React.FC = () => {
 
   const handleVoteSkip = () => {
     socket.emit('queue:voteSkip');
+  };
+
+  // Soundboard
+  const handleTriggerSound = (soundId: SoundEffectId) => {
+    socket.emit('soundboard:play', soundId);
   };
 
   // Settings updates
@@ -287,9 +325,14 @@ export const App: React.FC = () => {
   const currentSong = room.playback.currentSong;
   const currentTheme = THEMES[room.settings?.theme || 'neon'];
 
+  // Current active sound effect metadata for alert
+  const activeSoundMeta = lastSoundEvent
+    ? SOUND_EFFECTS.find((s) => s.id === lastSoundEvent.soundId)
+    : null;
+
   return (
     <div
-      className={`min-h-screen text-slate-100 flex flex-col transition-colors duration-500 pb-20 lg:pb-0`}
+      className="min-h-screen text-slate-100 flex flex-col transition-colors duration-500 pb-20 lg:pb-0 relative"
       style={{ backgroundColor: currentTheme.bgDark }}
     >
       {/* Top Navigation */}
@@ -302,14 +345,32 @@ export const App: React.FC = () => {
         onLeaveRoom={handleLeaveRoom}
       />
 
+      {/* Floating Soundboard Event Alert */}
+      {lastSoundEvent && activeSoundMeta && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-bounce">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/95 border border-pink-500/60 shadow-2xl backdrop-blur-md">
+            <span className="text-2xl">{activeSoundMeta.emoji}</span>
+            <div className="text-left leading-tight">
+              <span className="text-[11px] font-bold text-pink-400">
+                {lastSoundEvent.user.name}
+              </span>
+              <p className="text-xs text-white font-semibold">
+                ¡Tocó {activeSoundMeta.name}!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Room Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
-        {/* Left / Primary Column: Player & Stage (7 cols on desktop) */}
+        {/* Left / Primary Column: Player, Soundboard & Stage (7 cols on desktop) */}
         <div
-          className={`lg:col-span-7 flex flex-col gap-6 ${
+          className={`lg:col-span-7 flex flex-col gap-5 sm:gap-6 ${
             mobileTab === 'player' ? 'block' : 'hidden lg:flex'
           }`}
         >
+          {/* Synchronized Player */}
           <YouTubeSyncPlayer
             playback={room.playback}
             currentUser={currentUser}
@@ -324,11 +385,18 @@ export const App: React.FC = () => {
             onVoteSkip={handleVoteSkip}
             onOpenAddModal={() => setIsAddModalOpen(true)}
           />
+
+          {/* Soundboard DJ Effects */}
+          <Soundboard
+            onTriggerSound={handleTriggerSound}
+            isMuted={isSoundboardMuted}
+            onToggleMute={() => setIsSoundboardMuted(!isSoundboardMuted)}
+          />
         </div>
 
         {/* Right Column: Queue & Chat (Desktop only, or Mobile Tab switcher) */}
         <div
-          className={`lg:col-span-5 flex-col gap-6 ${
+          className={`lg:col-span-5 flex-col gap-5 sm:gap-6 ${
             mobileTab !== 'player' ? 'flex' : 'hidden lg:flex'
           }`}
         >
@@ -476,12 +544,13 @@ export const App: React.FC = () => {
         </button>
       </nav>
 
-      {/* Add Song Modal */}
+      {/* Add Song Modal with Integrated YouTube Search */}
       <AddSongModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         roomSettings={room.settings}
         onAddSong={handleAddSong}
+        onSearchYouTube={handleSearchYouTube}
       />
 
       {/* User List Modal */}

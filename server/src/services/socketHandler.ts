@@ -3,9 +3,11 @@ import {
   ClientToServerEvents,
   ServerToClientEvents,
   ChatMessage,
-  ReactionEvent
+  ReactionEvent,
+  SoundboardEvent
 } from '@mirocola/shared';
 import { RoomManager } from './roomManager.js';
+import { YouTubeService } from './youtubeService.js';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -245,6 +247,40 @@ export function setupSocketHandlers(io: TypedServer) {
         io.to(roomCode).emit('reaction:new', reaction);
       } catch (err: any) {
         socket.emit('room:error', err.message);
+      }
+    });
+
+    // 6. DJ Soundboard
+    socket.on('soundboard:play', (soundId) => {
+      try {
+        const { roomCode, userId } = getSession();
+        const room = roomManager.getRoom(roomCode);
+        const user = room?.users.find((u) => u.id === userId);
+        if (!user) return;
+
+        const event: SoundboardEvent = {
+          id: `sound_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          soundId,
+          user: {
+            id: user.id,
+            name: user.name
+          },
+          timestamp: Date.now()
+        };
+
+        io.to(roomCode).emit('soundboard:played', event);
+      } catch (err: any) {
+        socket.emit('room:error', err.message);
+      }
+    });
+
+    // 7. YouTube Search
+    socket.on('youtube:search', async (query, callback) => {
+      try {
+        const results = await YouTubeService.searchVideos(query, 6);
+        callback({ success: true, results });
+      } catch (err: any) {
+        callback({ success: false, error: err.message || 'Error en la búsqueda de YouTube' });
       }
     });
 

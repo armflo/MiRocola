@@ -72,6 +72,25 @@ export interface ReactionEvent {
     };
     timestamp: number;
 }
+export type SoundEffectId = 'airhorn' | 'applause' | 'scratch' | 'siren' | 'badumtss';
+export interface SoundboardEvent {
+    id: string;
+    soundId: SoundEffectId;
+    user: {
+        id: string;
+        name: string;
+    };
+    timestamp: number;
+}
+export interface YouTubeSearchResult {
+    youtubeId: string;
+    url: string;
+    title: string;
+    channelTitle: string;
+    durationSeconds: number;
+    durationFormatted: string;
+    thumbnail: string;
+}
 export interface ServerToClientEvents {
     'room:sync': (state: RoomState) => void;
     'room:error': (message: string) => void;
@@ -81,6 +100,7 @@ export interface ServerToClientEvents {
     'users:update': (users: User[]) => void;
     'chat:message': (message: ChatMessage) => void;
     'reaction:new': (reaction: ReactionEvent) => void;
+    'soundboard:played': (event: SoundboardEvent) => void;
     'skip:update': (skipVotes: string[], required: number) => void;
     'host:changed': (newHost: User) => void;
 }
@@ -124,5 +144,11 @@ export interface ClientToServerEvents {
     'queue:voteSkip': () => void;
     'chat:send': (text: string) => void;
     'reaction:send': (emoji: string) => void;
+    'soundboard:play': (soundId: SoundEffectId) => void;
+    'youtube:search': (query: string, callback: (response: {
+        success: boolean;
+        results?: YouTubeSearchResult[];
+        error?: string;
+    }) => void) => void;
     'room:setMode': (mode: RoomMode) => void;
 }
