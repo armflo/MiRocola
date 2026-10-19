@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Room {
+  id        Int           @id @default(autoincrement())
+  code      String        @unique
+  name      String
+  mode      String        @default("COLLABORATIVE") // COLLABORATIVE or DJ_ONLY
+  hostName  String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  history   SongHistory[]
+
+  @@index([code])
+}
+
+model SongHistory {
+  id           Int      @id @default(autoincrement())
+  roomId       Int
+  room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  youtubeId    String
+  title        String   @db.VarChar(500)
+  channelTitle String   @db.VarChar(255)
+  duration     Int
+  thumbnail    String   @db.VarChar(500)
+  addedBy      String
+  playedAt     DateTime @default(now())
+
+  @@index([roomId])
+}
