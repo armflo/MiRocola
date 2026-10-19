@@ -1,4 +1,14 @@
 export type RoomMode = 'COLLABORATIVE' | 'DJ_ONLY';
+export interface RoomSettings {
+    maxSongDurationSeconds: number;
+    maxSongsPerUserInQueue: number;
+    preventConsecutiveUserSongs: boolean;
+    allowDuplicates: boolean;
+    allowPlaylists: boolean;
+    voteSkipPercentage: number;
+    isQueueLocked: boolean;
+}
+export declare const DEFAULT_ROOM_SETTINGS: RoomSettings;
 export interface User {
     id: string;
     name: string;
@@ -33,6 +43,7 @@ export interface RoomState {
     name: string;
     hostId: string;
     mode: RoomMode;
+    settings: RoomSettings;
     playback: PlaybackState;
     queue: Song[];
     users: User[];
@@ -62,6 +73,7 @@ export interface ReactionEvent {
 export interface ServerToClientEvents {
     'room:sync': (state: RoomState) => void;
     'room:error': (message: string) => void;
+    'room:settingsUpdated': (settings: RoomSettings) => void;
     'playback:sync': (playback: PlaybackState) => void;
     'queue:update': (queue: Song[]) => void;
     'users:update': (users: User[]) => void;
@@ -85,10 +97,15 @@ export interface ClientToServerEvents {
         userName: string;
         avatar?: string;
         mode?: RoomMode;
+        settings?: Partial<RoomSettings>;
     }, callback: (response: {
         success: boolean;
         code?: string;
         state?: RoomState;
+        error?: string;
+    }) => void) => void;
+    'room:updateSettings': (settings: Partial<RoomSettings>, callback: (response: {
+        success: boolean;
         error?: string;
     }) => void) => void;
     'playback:play': (currentTime?: number) => void;

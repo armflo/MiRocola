@@ -6,7 +6,8 @@ import type {
   ChatMessage,
   ReactionEvent,
   RoomMode,
-  Song
+  Song,
+  RoomSettings
 } from '@mirocola/shared';
 import { socket } from './services/socket';
 import { Navbar } from './components/Navbar';
@@ -16,6 +17,7 @@ import { SongQueue } from './components/SongQueue';
 import { RoomChat } from './components/RoomChat';
 import { AddSongModal } from './components/AddSongModal';
 import { UserListModal } from './components/UserListModal';
+import { RoomSettingsModal } from './components/RoomSettingsModal';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -28,6 +30,7 @@ export const App: React.FC = () => {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeTabMobile, setActiveTabMobile] = useState<'queue' | 'chat'>('queue');
 
   // Socket event listeners
@@ -52,6 +55,10 @@ export const App: React.FC = () => {
       setRoom((prev) =>
         prev ? { ...prev, skipVotes, requiredSkipVotes: required } : prev
       );
+    }
+
+    function onSettingsUpdated(settings: RoomSettings) {
+      setRoom((prev) => (prev ? { ...prev, settings } : prev));
     }
 
     function onChatMessage(message: ChatMessage) {
@@ -90,6 +97,7 @@ export const App: React.FC = () => {
     socket.on('queue:update', onQueueUpdate);
     socket.on('users:update', onUsersUpdate);
     socket.on('skip:update', onSkipUpdate);
+    socket.on('room:settingsUpdated', onSettingsUpdated);
     socket.on('chat:message', onChatMessage);
     socket.on('reaction:new', onNewReaction);
     socket.on('host:changed', onHostChanged);
@@ -101,6 +109,7 @@ export const App: React.FC = () => {
       socket.off('queue:update', onQueueUpdate);
       socket.off('users:update', onUsersUpdate);
       socket.off('skip:update', onSkipUpdate);
+      socket.off('room:settingsUpdated', onSettingsUpdated);
       socket.off('chat:message', onChatMessage);
       socket.off('reaction:new', onNewReaction);
       socket.off('host:changed', onHostChanged);
@@ -192,13 +201,15 @@ export const App: React.FC = () => {
   };
 
   // Queue actions
-  const handleAddSong = async (urlOrQuery: string): Promise<boolean> => {
+  const handleAddSong = async (
+    urlOrQuery: string
+  ): Promise<{ success: boolean; error?: string }> => {
     return new Promise((resolve) => {
       socket.emit('queue:add', urlOrQuery, (response) => {
         if (response.success) {
-          resolve(true);
+          resolve({ success: true });
         } else {
-          resolve(false);
+          resolve({ success: false, error: response.error });
         }
       });
     });
@@ -214,6 +225,26 @@ export const App: React.FC = () => {
 
   const handleVoteSkip = () => {
     socket.emit('queue:voteSkip');
+  };
+
+  // Settings updates
+  const handleUpdateSettings = async (
+    settings: Partial<RoomSettings>
+  ): Promise<boolean> => {
+    return new Promise((resolve) => {
+      socket.emit('room:updateSettings', settings, (response) => {
+        if (response.success) {
+          resolve(true);
+        } else {
+          alert(response.error || 'No se pudo actualizar la configuración');
+          resolve(false);
+        }
+      });
+    });
+  };
+
+  const handleUpdateMode = (mode: RoomMode) => {
+    socket.emit('room:setMode', mode);
   };
 
   // Chat & reactions
@@ -246,6 +277,7 @@ export const App: React.FC = () => {
         room={room}
         currentUser={currentUser}
         onOpenUsers={() => setIsUsersModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onLeaveRoom={handleLeaveRoom}
       />
 
@@ -299,6 +331,7 @@ export const App: React.FC = () => {
                 queue={room.queue}
                 currentUser={currentUser}
                 roomMode={room.mode}
+                roomSettings={room.settings}
                 isHost={isHost}
                 onUpvote={handleUpvoteSong}
                 onRemove={handleRemoveSong}
@@ -324,6 +357,7 @@ export const App: React.FC = () => {
               queue={room.queue}
               currentUser={currentUser}
               roomMode={room.mode}
+              roomSettings={room.settings}
               isHost={isHost}
               onUpvote={handleUpvoteSong}
               onRemove={handleRemoveSong}
@@ -348,6 +382,7 @@ export const App: React.FC = () => {
       <AddSongModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        roomSettings={room.settings}
         onAddSong={handleAddSong}
       />
 
@@ -358,6 +393,18 @@ export const App: React.FC = () => {
         users={room.users}
         currentUserId={currentUser?.id}
       />
+
+      {/* Room Settings Modal (Host only) */}
+      {isHost && (
+        <RoomSettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          currentSettings={room.settings}
+          currentMode={room.mode}
+          onUpdateSettings={handleUpdateSettings}
+          onUpdateMode={handleUpdateMode}
+        />
+      )}
     </div>
   );
 };

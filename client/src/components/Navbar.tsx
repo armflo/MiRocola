@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Radio, Copy, Check, Users, Shield, LogOut } from 'lucide-react';
+import { Radio, Copy, Check, Users, Shield, LogOut, Settings, Lock } from 'lucide-react';
 import type { RoomState, User } from '@mirocola/shared';
 
 interface NavbarProps {
   room: RoomState;
   currentUser: User | null;
   onOpenUsers: () => void;
+  onOpenSettings?: () => void;
   onLeaveRoom: () => void;
 }
 
@@ -13,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   room,
   currentUser,
   onOpenUsers,
+  onOpenSettings,
   onLeaveRoom
 }) => {
   const [copied, setCopied] = useState(false);
@@ -22,6 +24,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const isHost = currentUser?.isHost ?? false;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-purple-900/40 bg-slate-950/80 backdrop-blur-md px-4 lg:px-8 py-3">
@@ -39,6 +43,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800/50">
                 {room.mode === 'COLLABORATIVE' ? 'Colaborativo' : 'Modo DJ'}
               </span>
+              {room.settings?.isQueueLocked && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-950/80 border border-red-800/60 text-red-300 font-semibold animate-pulse">
+                  <Lock className="w-3 h-3 text-red-400" />
+                  Cola Cerrada
+                </span>
+              )}
             </div>
             <h1 className="text-sm font-semibold text-slate-200 truncate max-w-[180px] sm:max-w-xs">
               {room.name}
@@ -52,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={handleCopyCode}
             title="Haz clic para copiar el código de sala"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-purple-800/40 hover:border-purple-500/70 text-slate-200 hover:text-white transition-all group"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-purple-800/40 hover:border-purple-500/70 text-slate-200 hover:text-white transition-all group cursor-pointer"
           >
             <span className="text-xs text-purple-400 font-medium hidden sm:inline">CÓDIGO:</span>
             <span className="font-mono font-bold tracking-widest text-pink-400 text-sm">
@@ -68,11 +78,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Users button */}
           <button
             onClick={onOpenUsers}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-800/40 hover:bg-purple-900/40 text-purple-200 text-sm font-medium transition-colors"
+            title="Ver amigos en la sala"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-800/40 hover:bg-purple-900/40 text-purple-200 text-sm font-medium transition-colors cursor-pointer"
           >
             <Users className="w-4 h-4 text-purple-400" />
             <span>{room.users.length}</span>
           </button>
+
+          {/* Settings button (Host only) */}
+          {isHost && onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              title="Configurar reglas de la sala (duración, límites, etc.)"
+              className="p-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800/50 text-pink-400 hover:text-white transition-colors cursor-pointer relative"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-pink-500 animate-ping" />
+            </button>
+          )}
 
           {/* User Avatar badge */}
           {currentUser && (
@@ -102,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onLeaveRoom}
             title="Salir de la sala"
-            className="p-2 rounded-lg bg-slate-900/80 hover:bg-red-950/40 border border-slate-800 hover:border-red-800/50 text-slate-400 hover:text-red-400 transition-colors"
+            className="p-2 rounded-lg bg-slate-900/80 hover:bg-red-950/40 border border-slate-800 hover:border-red-800/50 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>

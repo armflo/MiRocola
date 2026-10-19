@@ -1,12 +1,13 @@
 import React from 'react';
-import type { Song, User, RoomMode } from '@mirocola/shared';
-import { Music, Trash2, Plus, Flame } from 'lucide-react';
+import type { Song, User, RoomMode, RoomSettings } from '@mirocola/shared';
+import { Music, Trash2, Plus, Flame, Lock, Clock } from 'lucide-react';
 import { formatTime } from '../lib/utils';
 
 interface SongQueueProps {
   queue: Song[];
   currentUser: User | null;
   roomMode: RoomMode;
+  roomSettings?: RoomSettings;
   isHost: boolean;
   onUpvote: (songId: string) => void;
   onRemove: (songId: string) => void;
@@ -17,15 +18,18 @@ export const SongQueue: React.FC<SongQueueProps> = ({
   queue,
   currentUser,
   roomMode,
+  roomSettings,
   isHost,
   onUpvote,
   onRemove,
   onOpenAddModal
 }) => {
+  const isLocked = roomSettings?.isQueueLocked ?? false;
+
   return (
     <div className="bg-slate-900/80 border border-purple-900/40 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-xl flex flex-col h-full min-h-[420px]">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-purple-900/30 mb-4">
+      <div className="flex items-center justify-between pb-3 border-b border-purple-900/30 mb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-purple-950 text-pink-400">
             <Music className="w-4 h-4" />
@@ -42,12 +46,55 @@ export const SongQueue: React.FC<SongQueueProps> = ({
 
         <button
           onClick={onOpenAddModal}
-          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white text-xs font-bold shadow-md shadow-purple-600/25 flex items-center gap-1.5 transition-all cursor-pointer"
+          disabled={isLocked}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all ${
+            isLocked
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+              : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white shadow-purple-600/25 cursor-pointer'
+          }`}
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Pedir Tema</span>
+          {isLocked ? (
+            <>
+              <Lock className="w-3.5 h-3.5 text-red-400" />
+              <span>Cola Cerrada</span>
+            </>
+          ) : (
+            <>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Pedir Tema</span>
+            </>
+          )}
         </button>
       </div>
+
+      {/* Rules pill notice */}
+      {roomSettings && (
+        <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-purple-950/30 border border-purple-900/30 flex items-center justify-between text-[10px] text-purple-300">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
+            {roomSettings.maxSongDurationSeconds > 0 && (
+              <span className="flex items-center gap-1 flex-shrink-0">
+                <Clock className="w-3 h-3 text-pink-400" />
+                Máx {Math.floor(roomSettings.maxSongDurationSeconds / 60)}m
+              </span>
+            )}
+            {roomSettings.maxSongsPerUserInQueue > 0 && (
+              <span className="flex items-center gap-1 flex-shrink-0">
+                • Máx {roomSettings.maxSongsPerUserInQueue} temas/usuario
+              </span>
+            )}
+            {roomSettings.preventConsecutiveUserSongs && (
+              <span className="flex items-center gap-1 flex-shrink-0">
+                • Sin temas consecutivos
+              </span>
+            )}
+          </div>
+          {isLocked && (
+            <span className="text-red-400 font-bold flex items-center gap-1 flex-shrink-0 pl-1">
+              <Lock className="w-3 h-3" /> Cerrada
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Queue list */}
       <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
@@ -56,14 +103,18 @@ export const SongQueue: React.FC<SongQueueProps> = ({
             <Music className="w-8 h-8 text-purple-400/50 mb-2" />
             <p className="text-sm font-medium text-slate-300">La cola está vacía</p>
             <p className="text-xs text-slate-500 mt-1 max-w-xs">
-              ¡Pide una canción ahora para que la fiesta no se detenga!
+              {isLocked
+                ? 'El anfitrión ha cerrado temporalmente los pedidos de la rocola.'
+                : '¡Pide una canción ahora para que la fiesta no se detenga!'}
             </p>
-            <button
-              onClick={onOpenAddModal}
-              className="mt-3 text-xs text-pink-400 hover:text-pink-300 font-semibold underline underline-offset-4 cursor-pointer"
-            >
-              Agregar canción
-            </button>
+            {!isLocked && (
+              <button
+                onClick={onOpenAddModal}
+                className="mt-3 text-xs text-pink-400 hover:text-pink-300 font-semibold underline underline-offset-4 cursor-pointer"
+              >
+                Agregar canción
+              </button>
+            )}
           </div>
         ) : (
           queue.map((song, index) => {

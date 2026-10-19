@@ -22,7 +22,8 @@ export function setupSocketHandlers(io: TypedServer) {
           payload.userName,
           payload.avatar || '',
           payload.mode || 'COLLABORATIVE',
-          socket.id
+          socket.id,
+          payload.settings
         );
 
         socket.join(room.code);
@@ -248,6 +249,30 @@ export function setupSocketHandlers(io: TypedServer) {
     });
 
     // 6. Room Settings
+    socket.on('room:updateSettings', (settings, callback) => {
+      try {
+        const { roomCode, userId } = getSession();
+        const room = roomManager.updateSettings(roomCode, userId, settings);
+
+        io.to(roomCode).emit('room:sync', room);
+        io.to(roomCode).emit('room:settingsUpdated', room.settings);
+        io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
+
+        callback({ success: true });
+
+        const configMsg: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          user: { id: 'system', name: 'MiRocola', avatar: '' },
+          text: `⚙️ El anfitrión actualizó las reglas de la rocola.`,
+          timestamp: Date.now(),
+          isSystem: true
+        };
+        io.to(roomCode).emit('chat:message', configMsg);
+      } catch (err: any) {
+        callback({ success: false, error: err.message || 'Error al actualizar configuraciones' });
+      }
+    });
+
     socket.on('room:setMode', (mode) => {
       try {
         const { roomCode, userId } = getSession();

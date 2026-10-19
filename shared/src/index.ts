@@ -1,5 +1,25 @@
 export type RoomMode = 'COLLABORATIVE' | 'DJ_ONLY';
 
+export interface RoomSettings {
+  maxSongDurationSeconds: number; // 0 = unlimited, e.g. 600 (10 mins)
+  maxSongsPerUserInQueue: number; // 0 = unlimited, e.g. 3
+  preventConsecutiveUserSongs: boolean; // true = cannot queue twice in a row
+  allowDuplicates: boolean; // false = disallow same song in queue/playing
+  allowPlaylists: boolean; // false = only single songs allowed
+  voteSkipPercentage: number; // e.g. 50 (%)
+  isQueueLocked: boolean; // true = no new songs can be added
+}
+
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  maxSongDurationSeconds: 600, // 10 minutes default
+  maxSongsPerUserInQueue: 3, // 3 songs max per user default
+  preventConsecutiveUserSongs: true, // prevent queue hoarding
+  allowDuplicates: false, // no duplicates by default
+  allowPlaylists: false, // single songs only
+  voteSkipPercentage: 50, // 50% of listeners
+  isQueueLocked: false
+};
+
 export interface User {
   id: string;
   name: string;
@@ -37,6 +57,7 @@ export interface RoomState {
   name: string;
   hostId: string;
   mode: RoomMode;
+  settings: RoomSettings;
   playback: PlaybackState;
   queue: Song[];
   users: User[];
@@ -70,6 +91,7 @@ export interface ReactionEvent {
 export interface ServerToClientEvents {
   'room:sync': (state: RoomState) => void;
   'room:error': (message: string) => void;
+  'room:settingsUpdated': (settings: RoomSettings) => void;
   'playback:sync': (playback: PlaybackState) => void;
   'queue:update': (queue: Song[]) => void;
   'users:update': (users: User[]) => void;
@@ -85,8 +107,18 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; state?: RoomState; error?: string }) => void
   ) => void;
   'room:create': (
-    payload: { roomName: string; userName: string; avatar?: string; mode?: RoomMode },
+    payload: {
+      roomName: string;
+      userName: string;
+      avatar?: string;
+      mode?: RoomMode;
+      settings?: Partial<RoomSettings>;
+    },
     callback: (response: { success: boolean; code?: string; state?: RoomState; error?: string }) => void
+  ) => void;
+  'room:updateSettings': (
+    settings: Partial<RoomSettings>,
+    callback: (response: { success: boolean; error?: string }) => void
   ) => void;
   'playback:play': (currentTime?: number) => void;
   'playback:pause': (currentTime?: number) => void;

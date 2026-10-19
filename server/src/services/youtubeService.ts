@@ -21,8 +21,8 @@ export class YouTubeService {
 
     // Standard YouTube URL patterns
     const patterns = [
-      /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
-      /^[a-zA-Z0-9_-]{11}$/
+      /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/|shorts\/)|youtu\.be\/|music\.youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
     ];
 
     for (const pattern of patterns) {
@@ -36,20 +36,66 @@ export class YouTubeService {
   }
 
   /**
-   * Fetch metadata using oEmbed (free, fast, no API key required)
+   * Check if input is a playlist-only URL
+   */
+  static isPlaylistOnly(input: string): boolean {
+    const trimmed = input.trim();
+    return (
+      trimmed.includes('youtube.com/playlist?list=') &&
+      !this.extractVideoId(trimmed)
+    );
+  }
+
+  /**
+   * Fetch video duration in seconds by scraping the initial player response or oEmbed
+   */
+  private static async fetchVideoDuration(videoId: string): Promise<number> {
+    try {
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+        }
+      });
+
+      if (res.ok) {
+        const html = await res.text();
+        const match = html.match(/"lengthSeconds":"(\d+)"/);
+        if (match && match[1]) {
+          return parseInt(match[1], 10);
+        }
+      }
+    } catch (err) {
+      console.warn(`[YouTubeService] Could not scrape duration for ${videoId}:`, err);
+    }
+    return 0;
+  }
+
+  /**
+   * Fetch metadata using oEmbed + duration scraping
    * Falls back to YouTube Data API if key is set in .env
    */
   static async getVideoMeta(input: string): Promise<YouTubeMeta> {
-    const videoId = this.extractVideoId(input);
+    const trimmed = input.trim();
+
+    if (this.isPlaylistOnly(trimmed)) {
+      throw new Error(
+        'No se permiten enlaces de listas de reproducción completas. Ingresa un enlace a un video o canción individual.'
+      );
+    }
+
+    const videoId = this.extractVideoId(trimmed);
 
     if (!videoId) {
-      // If it's a search term rather than a direct URL, we can use search
-      return await this.searchOrFallback(input);
+      // If it's a search term rather than a direct URL, search or fallback
+      return await this.searchOrFallback(trimmed);
     }
 
     const standardUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // If YOUTUBE_API_KEY is available, use YouTube Data API for precise duration
+    // 1. If YOUTUBE_API_KEY is available, use YouTube Data API
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (apiKey) {
       try {
@@ -80,33 +126,36 @@ export class YouTubeService {
       }
     }
 
-    // Default fast oEmbed path (no API key needed!)
+    // 2. Fetch oEmbed metadata + precise scraped duration
     try {
       const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(standardUrl)}&format=json`;
-      const res = await fetch(oembedUrl);
+      const [oembedRes, scrapedDuration] = await Promise.all([
+        fetch(oembedUrl),
+        this.fetchVideoDuration(videoId)
+      ]);
 
-      if (!res.ok) {
-        throw new Error(`YouTube oEmbed returned status ${res.status}`);
+      if (!oembedRes.ok) {
+        throw new Error(`YouTube oEmbed returned status ${oembedRes.status}`);
       }
 
-      const data = (await res.json()) as any;
+      const data = (await oembedRes.json()) as any;
 
       return {
         youtubeId: videoId,
         url: standardUrl,
         title: data.title || 'Video de YouTube',
         channelTitle: data.author_name || 'YouTube',
-        durationSeconds: 0, // 0 = will be reported dynamically by client player
+        durationSeconds: scrapedDuration,
         thumbnail: data.thumbnail_url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
       };
-    } catch (error) {
-      // Last-ditch fallback: construct minimal valid meta
+    } catch (error: any) {
+      const fallbackDuration = await this.fetchVideoDuration(videoId);
       return {
         youtubeId: videoId,
         url: standardUrl,
         title: `Canción (${videoId})`,
         channelTitle: 'YouTube',
-        durationSeconds: 0,
+        durationSeconds: fallbackDuration,
         thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
       };
     }
@@ -128,12 +177,13 @@ export class YouTubeService {
           if (data.items && data.items.length > 0) {
             const item = data.items[0];
             const videoId = item.id.videoId;
+            const duration = await this.fetchVideoDuration(videoId);
             return {
               youtubeId: videoId,
               url: `https://www.youtube.com/watch?v=${videoId}`,
               title: item.snippet.title,
               channelTitle: item.snippet.channelTitle,
-              durationSeconds: 0,
+              durationSeconds: duration,
               thumbnail: item.snippet.thumbnails?.high?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
             };
           }

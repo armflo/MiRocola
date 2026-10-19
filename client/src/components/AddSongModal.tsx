@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { X, Search, Loader2, Sparkles, CheckCircle } from 'lucide-react';
+import { X, Search, Loader2, Sparkles, CheckCircle, ShieldAlert } from 'lucide-react';
+import type { RoomSettings } from '@mirocola/shared';
 
 interface AddSongModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddSong: (urlOrQuery: string) => Promise<boolean>;
+  roomSettings?: RoomSettings;
+  onAddSong: (urlOrQuery: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const PRESET_HITS = [
@@ -15,7 +17,12 @@ const PRESET_HITS = [
   { label: 'Lo-Fi Chill Beats', query: 'https://www.youtube.com/watch?v=jfKfPfyJRdk' }
 ];
 
-export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onAddSong }) => {
+export const AddSongModal: React.FC<AddSongModalProps> = ({
+  isOpen,
+  onClose,
+  roomSettings,
+  onAddSong
+}) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,8 +39,8 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
     setSuccess(false);
 
     try {
-      const ok = await onAddSong(input.trim());
-      if (ok) {
+      const res = await onAddSong(input.trim());
+      if (res.success) {
         setSuccess(true);
         setInput('');
         setTimeout(() => {
@@ -41,7 +48,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
           onClose();
         }, 1200);
       } else {
-        setError('No se pudo encontrar o procesar este enlace');
+        setError(res.error || 'No se pudo procesar este enlace');
       }
     } catch (err: any) {
       setError(err.message || 'Error al agregar la canción');
@@ -66,25 +73,39 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500">
-            {/* Custom YouTube SVG Icon */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500 flex-shrink-0">
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
             </svg>
           </div>
           <div>
             <h3 className="text-lg font-bold text-white">Pedir Canción a la Rocola</h3>
             <p className="text-xs text-slate-400">
-              Pega cualquier enlace de YouTube o YouTube Music.
+              Pega el enlace de una canción o video individual de YouTube.
             </p>
           </div>
         </div>
 
+        {/* Active room limitations banner */}
+        {roomSettings && (
+          <div className="mb-4 p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 text-[11px] text-purple-200 flex flex-wrap items-center gap-2">
+            <ShieldAlert className="w-3.5 h-3.5 text-pink-400 flex-shrink-0" />
+            <span>
+              {roomSettings.maxSongDurationSeconds > 0
+                ? `Duración máx: ${Math.floor(roomSettings.maxSongDurationSeconds / 60)} min`
+                : 'Duración libre'}{' '}
+              • Solo canciones individuales (no playlists completas)
+              {roomSettings.preventConsecutiveUserSongs ? ' • Turnos alternados' : ''}
+            </span>
+          </div>
+        )}
+
         {/* Feedback Messages */}
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs">
-            {error}
+          <div className="mb-4 p-3 rounded-xl bg-red-950/70 border border-red-800 text-red-200 text-xs flex items-start gap-2">
+            <span className="text-base leading-none">⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
@@ -136,7 +157,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
               Cancelar
             </button>
@@ -148,7 +169,7 @@ export const AddSongModal: React.FC<AddSongModalProps> = ({ isOpen, onClose, onA
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Buscando...</span>
+                  <span>Verificando y agregando...</span>
                 </>
               ) : (
                 <span>Agregar a la Cola</span>

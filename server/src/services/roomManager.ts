@@ -1,4 +1,12 @@
-import { RoomState, Song, User, RoomMode, PlaybackState } from '@mirocola/shared';
+import {
+  RoomState,
+  Song,
+  User,
+  RoomMode,
+  PlaybackState,
+  RoomSettings,
+  DEFAULT_ROOM_SETTINGS
+} from '@mirocola/shared';
 import { prisma } from '../config/db.js';
 import { YouTubeService } from './youtubeService.js';
 
@@ -45,7 +53,8 @@ export class RoomManager {
     userName: string,
     avatar: string,
     mode: RoomMode = 'COLLABORATIVE',
-    socketId: string
+    socketId: string,
+    customSettings?: Partial<RoomSettings>
   ): Promise<{ room: RoomState; user: User }> {
     let code = this.generateRoomCode();
     while (this.rooms.has(code)) {
@@ -61,11 +70,17 @@ export class RoomManager {
       joinedAt: Date.now()
     };
 
+    const settings: RoomSettings = {
+      ...DEFAULT_ROOM_SETTINGS,
+      ...customSettings
+    };
+
     const roomState: RoomState = {
       code,
       name: roomName.trim() || `Rocola ${code}`,
       hostId: userId,
       mode,
+      settings,
       playback: {
         currentSong: null,
         isPlaying: false,
@@ -183,7 +198,31 @@ export class RoomManager {
   }
 
   /**
-   * Add a song to the room queue
+   * Update Room Settings (Host only)
+   */
+  public updateSettings(
+    code: string,
+    userId: string,
+    newSettings: Partial<RoomSettings>
+  ): RoomState {
+    const room = this.getRoom(code);
+    if (!room) throw new Error('Sala no encontrada');
+
+    if (room.hostId !== userId) {
+      throw new Error('Solo el anfitrión de la sala puede modificar las configuraciones.');
+    }
+
+    room.settings = {
+      ...room.settings,
+      ...newSettings
+    };
+
+    this.updateSkipRequirement(room);
+    return room;
+  }
+
+  /**
+   * Add a song to the room queue with strict rule validations
    */
   public async addSong(
     code: string,
@@ -193,7 +232,56 @@ export class RoomManager {
     const room = this.getRoom(code);
     if (!room) throw new Error('Sala no encontrada');
 
+    // Rule 1: Queue lock check
+    if (room.settings.isQueueLocked) {
+      throw new Error('La cola de pedidos está cerrada temporalmente por el anfitrión.');
+    }
+
+    // Rule 2: Max songs per user in queue
+    if (room.settings.maxSongsPerUserInQueue > 0) {
+      const userSongsCount = room.queue.filter((s) => s.addedBy.id === user.id).length;
+      if (userSongsCount >= room.settings.maxSongsPerUserInQueue) {
+        throw new Error(
+          `Ya tienes ${userSongsCount} canciones en la cola. El límite por persona es de ${room.settings.maxSongsPerUserInQueue}.`
+        );
+      }
+    }
+
+    // Rule 3: Anti-consecutive song monopolization
+    if (room.settings.preventConsecutiveUserSongs && room.users.length > 1) {
+      const lastQueuedSong =
+        room.queue.length > 0 ? room.queue[room.queue.length - 1] : room.playback.currentSong;
+      if (lastQueuedSong && lastQueuedSong.addedBy.id === user.id) {
+        throw new Error(
+          'No puedes agregar dos canciones seguidas para evitar monopolizar la rocola. Dale turno a tus amigos.'
+        );
+      }
+    }
+
+    // Extract metadata & duration
     const meta = await YouTubeService.getVideoMeta(urlOrQuery);
+
+    // Rule 4: Song duration limit
+    if (
+      room.settings.maxSongDurationSeconds > 0 &&
+      meta.durationSeconds > room.settings.maxSongDurationSeconds
+    ) {
+      const maxMins = Math.floor(room.settings.maxSongDurationSeconds / 60);
+      const songMins = Math.floor(meta.durationSeconds / 60);
+      const songSecs = meta.durationSeconds % 60;
+      throw new Error(
+        `Esta canción dura ${songMins}m ${songSecs < 10 ? '0' : ''}${songSecs}s, pero el anfitrión estableció un límite máximo de ${maxMins} minutos.`
+      );
+    }
+
+    // Rule 5: Duplicate songs check
+    if (!room.settings.allowDuplicates) {
+      const isCurrentlyPlaying = room.playback.currentSong?.youtubeId === meta.youtubeId;
+      const isAlreadyInQueue = room.queue.some((s) => s.youtubeId === meta.youtubeId);
+      if (isCurrentlyPlaying || isAlreadyInQueue) {
+        throw new Error('Esta canción ya está sonando o en la lista de espera de la rocola.');
+      }
+    }
 
     const song: Song = {
       id: `song_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -412,8 +500,9 @@ export class RoomManager {
 
   private updateSkipRequirement(room: RoomState) {
     const count = room.users.length;
-    // Over 50% required to skip
-    room.requiredSkipVotes = Math.max(1, Math.ceil(count / 2));
+    const percentage = room.settings?.voteSkipPercentage || 50;
+    // Calculate required votes based on room settings percentage
+    room.requiredSkipVotes = Math.max(1, Math.ceil((count * percentage) / 100));
   }
 
   /**
