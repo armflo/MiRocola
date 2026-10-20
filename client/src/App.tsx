@@ -381,6 +381,7 @@ export const App: React.FC = () => {
             playback={room.playback}
             currentUser={currentUser}
             roomMode={room.mode}
+            roomSettings={room.settings}
             isHost={isHost}
             skipVotes={room.skipVotes}
             requiredSkipVotes={room.requiredSkipVotes}

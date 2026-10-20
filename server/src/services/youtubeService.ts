@@ -49,7 +49,7 @@ export class YouTubeService {
   }
 
   /**
-   * Fetch video duration in seconds by scraping the initial player response or oEmbed
+   * Fetch video duration in seconds by scraping the initial player response, meta tags, or public APIs
    */
   private static async fetchVideoDuration(videoId: string): Promise<number> {
     try {
@@ -58,20 +58,65 @@ export class YouTubeService {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          'Cookie': 'SOCS=CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg'
         }
       });
 
       if (res.ok) {
         const html = await res.text();
-        const match = html.match(/"lengthSeconds":"(\d+)"/);
-        if (match && match[1]) {
-          return parseInt(match[1], 10);
+
+        // Method 1: lengthSeconds in ytInitialPlayerResponse
+        const match1 = html.match(/"lengthSeconds":"(\d+)"/);
+        if (match1 && match1[1] && parseInt(match1[1], 10) > 0) {
+          return parseInt(match1[1], 10);
+        }
+
+        // Method 2: approxDurationMs in streaming data
+        const match2 = html.match(/"approxDurationMs":"(\d+)"/);
+        if (match2 && match2[1] && parseInt(match2[1], 10) > 0) {
+          return Math.floor(parseInt(match2[1], 10) / 1000);
+        }
+
+        // Method 3: itemprop="duration" meta tag (e.g. PT51M14S)
+        const match3 = html.match(/itemprop="duration"\s+content="([^"]+)"/i);
+        if (match3 && match3[1]) {
+          const durationFromIso = this.parseISODuration(match3[1]);
+          if (durationFromIso > 0) {
+            return durationFromIso;
+          }
         }
       }
     } catch (err) {
-      console.warn(`[YouTubeService] Could not scrape duration for ${videoId}:`, err);
+      console.warn(`[YouTubeService] Primary duration scraping failed for ${videoId}:`, err);
     }
+
+    // Method 4: Fallback to public Invidious API if direct scraping was rate-limited or blocked
+    try {
+      const invidiousInstances = [
+        'https://inv.nadeko.net',
+        'https://invidious.nerdvpn.de',
+        'https://vid.puffyan.us'
+      ];
+      for (const host of invidiousInstances) {
+        try {
+          const invRes = await fetch(`${host}/api/v1/videos/${videoId}`, {
+            signal: AbortSignal.timeout(3000)
+          });
+          if (invRes.ok) {
+            const data = (await invRes.json()) as any;
+            if (data.lengthSeconds && data.lengthSeconds > 0) {
+              return parseInt(data.lengthSeconds, 10);
+            }
+          }
+        } catch {
+          // Continue to next instance
+        }
+      }
+    } catch (err) {
+      console.warn(`[YouTubeService] Invidious fallback failed for ${videoId}:`, err);
+    }
+
     return 0;
   }
 

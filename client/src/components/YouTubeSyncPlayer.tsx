@@ -10,9 +10,11 @@ import {
   VideoOff,
   Flame,
   Music2,
-  Clock
+  Clock,
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
-import type { PlaybackState, User, RoomMode } from '@mirocola/shared';
+import type { PlaybackState, User, RoomMode, RoomSettings } from '@mirocola/shared';
 import { formatTime } from '../lib/utils';
 
 declare global {
@@ -26,6 +28,7 @@ interface YouTubeSyncPlayerProps {
   playback: PlaybackState;
   currentUser: User | null;
   roomMode: RoomMode;
+  roomSettings?: RoomSettings;
   isHost: boolean;
   skipVotes: string[];
   requiredSkipVotes: number;
@@ -41,6 +44,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
   playback,
   currentUser,
   roomMode,
+  roomSettings,
   isHost,
   skipVotes,
   requiredSkipVotes,
@@ -58,10 +62,40 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [showVideo, setShowVideo] = useState(true);
+  const [playbackError, setPlaybackError] = useState<{
+    code: number;
+    title: string;
+    message: string;
+    countdown: number;
+  } | null>(null);
 
   const canControl = roomMode === 'COLLABORATIVE' || isHost;
   const currentSong = playback.currentSong;
   const hasVotedSkip = currentUser ? skipVotes.includes(currentUser.id) : false;
+
+  // Clear playback error when current song changes
+  useEffect(() => {
+    setPlaybackError(null);
+  }, [currentSong?.youtubeId]);
+
+  // Countdown timer for automatic skipping of unplayable videos
+  useEffect(() => {
+    if (!playbackError) return;
+    if (playbackError.countdown <= 0) {
+      if (canControl) {
+        onNext();
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPlaybackError((prev) =>
+        prev ? { ...prev, countdown: prev.countdown - 1 } : null
+      );
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [playbackError, canControl, onNext]);
 
   // Initialize YouTube Iframe API
   useEffect(() => {
@@ -105,6 +139,31 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
                 onNext();
               }
             }
+          },
+          onError: (event: any) => {
+            const code = event.data;
+            console.warn('[YouTube Player] Playback error code:', code);
+            let title = 'Video no disponible';
+            let message = 'Este video no se puede reproducir en el reproductor integrado.';
+
+            if (code === 101 || code === 150) {
+              title = 'Incrustación Bloqueada por Copyright';
+              message =
+                'El autor o la discográfica (ej. LatinAutor / UMPG / Sony) ha bloqueado la reproducción de este video fuera de YouTube.';
+            } else if (code === 100) {
+              title = 'Video no encontrado o privado';
+              message = 'El video fue eliminado o marcado como privado por su autor.';
+            } else if (code === 2) {
+              title = 'Enlace o ID de video inválido';
+              message = 'El parámetro del video de YouTube no es válido.';
+            }
+
+            setPlaybackError({
+              code,
+              title,
+              message,
+              countdown: 6
+            });
           }
         }
       });
@@ -155,7 +214,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     }
   }, [playback, isPlayerReady, currentSong?.youtubeId]);
 
-  // Local ticker for smooth progress bar updates
+  // Local ticker for smooth progress bar updates and duration limit checks
   useEffect(() => {
     const timer = setInterval(() => {
       if (isPlayerReady && playerRef.current && playerRef.current.getCurrentTime) {
@@ -163,11 +222,30 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
         const dur = playerRef.current.getDuration() || currentSong?.durationSeconds || 0;
         setLocalCurrentTime(time);
         setDuration(dur);
+
+        // Failsafe: If loaded video exceeds the room's duration limit, notify and auto-skip
+        if (
+          dur > 0 &&
+          roomSettings?.maxSongDurationSeconds &&
+          roomSettings.maxSongDurationSeconds > 0 &&
+          dur > roomSettings.maxSongDurationSeconds &&
+          !playbackError
+        ) {
+          const maxMins = Math.floor(roomSettings.maxSongDurationSeconds / 60);
+          const songMins = Math.floor(dur / 60);
+          const songSecs = Math.floor(dur % 60);
+          setPlaybackError({
+            code: 999,
+            title: 'Duración Excede el Límite de la Sala',
+            message: `Esta canción dura ${songMins}m ${songSecs < 10 ? '0' : ''}${songSecs}s y supera el límite máximo de ${maxMins} minutos establecido para esta sala.`,
+            countdown: 5
+          });
+        }
       }
     }, 500);
 
     return () => clearInterval(timer);
-  }, [isPlayerReady, currentSong]);
+  }, [isPlayerReady, currentSong, roomSettings?.maxSongDurationSeconds, playbackError]);
 
   // Volume control
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -309,6 +387,60 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
               </>
             )}
           </button>
+        )}
+
+        {/* Playback Error Overlay (e.g. Embedding restricted by LatinAutor / Universal / Exceeds duration) */}
+        {playbackError && currentSong && (
+          <div className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in border-2 border-red-500/50">
+            <div className="w-14 h-14 rounded-2xl bg-red-950/80 border border-red-600/60 flex items-center justify-center text-red-400 mb-3 shadow-lg shadow-red-500/20">
+              <AlertTriangle className="w-8 h-8 animate-pulse" />
+            </div>
+
+            <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
+              {playbackError.title}
+            </h3>
+
+            <p className="text-xs text-red-200/90 max-w-md mb-2 leading-relaxed">
+              {playbackError.message}
+            </p>
+
+            <p className="text-[11px] text-slate-400 mb-5 truncate max-w-sm">
+              Canción: <span className="font-semibold text-slate-200">{currentSong.title}</span>
+            </p>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              {canControl ? (
+                <button
+                  onClick={onNext}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 hover:opacity-90 font-bold text-xs text-white shadow-lg shadow-red-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                >
+                  <SkipForward className="w-4 h-4" />
+                  <span>
+                    Saltar ahora {playbackError.countdown > 0 && `(${playbackError.countdown}s)`}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  onClick={onVoteSkip}
+                  className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 font-bold text-xs text-white shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Flame className="w-4 h-4" />
+                  <span>Votar para saltar ({skipVotes.length}/{requiredSkipVotes})</span>
+                </button>
+              )}
+
+              <a
+                href={currentSong.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors"
+              >
+                <span>Mirar en YouTube</span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+              </a>
+            </div>
+          </div>
         )}
       </div>
 
