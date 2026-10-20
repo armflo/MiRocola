@@ -4,6 +4,20 @@ import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware.
 
 export const authRouter = Router();
 
+function formatAuthError(err: any): string {
+  const msg = err?.message || '';
+  if (msg.includes('insecure transport') || msg.includes('1105')) {
+    return 'La base de datos en la nube (TiDB Cloud) requiere SSL. Asegúrate de añadir "?sslaccept=strict" al final de tu variable DATABASE_URL en Render.';
+  }
+  if (msg.includes("doesn't exist") || msg.includes('P2021')) {
+    return 'Las tablas de la base de datos aún no se han creado. Revisa el despliegue de Render.';
+  }
+  if (msg.includes("Can't reach database server") || msg.includes('P1001')) {
+    return 'No se pudo conectar al servidor de base de datos. Revisa las credenciales de Render.';
+  }
+  return msg || 'Error en la autenticación';
+}
+
 /**
  * POST /api/auth/register
  */
@@ -25,7 +39,7 @@ authRouter.post('/register', async (req, res: Response) => {
   } catch (err: any) {
     return res.status(400).json({
       success: false,
-      error: err.message || 'Error al registrar usuario'
+      error: formatAuthError(err)
     });
   }
 });
@@ -48,7 +62,7 @@ authRouter.post('/login', async (req, res: Response) => {
   } catch (err: any) {
     return res.status(401).json({
       success: false,
-      error: err.message || 'Credenciales incorrectas'
+      error: formatAuthError(err)
     });
   }
 });
