@@ -12,7 +12,8 @@ import {
   Play,
   Pause,
   SkipForward,
-  Mic2
+  Mic2,
+  Clock
 } from 'lucide-react';
 import type {
   RoomState,
@@ -33,6 +34,8 @@ interface PartyTvModeProps {
   currentUser: User | null;
   reactions: ReactionEvent[];
   lastSoundEvent: SoundboardEvent | null;
+  inactivityWarning?: { remainingSeconds: number } | null;
+  onKeepAlive?: () => void;
   onPlay: () => void;
   onPause: () => void;
   onNext: () => void;
@@ -45,6 +48,8 @@ export const PartyTvMode: React.FC<PartyTvModeProps> = ({
   currentUser,
   reactions,
   lastSoundEvent,
+  inactivityWarning,
+  onKeepAlive,
   onPlay,
   onPause,
   onNext
@@ -170,6 +175,33 @@ export const PartyTvMode: React.FC<PartyTvModeProps> = ({
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Inactivity Warning Countdown Alert on TV */}
+      {inactivityWarning && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-lg bg-amber-950/95 border-2 border-amber-500 rounded-3xl p-4 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex-shrink-0">
+              <Clock className="w-6 h-6 animate-spin" />
+            </div>
+            <div className="min-w-0 text-left">
+              <h5 className="text-sm font-black text-white">
+                ⚠️ Sala Inactiva — Se cerrará en {formatTime(inactivityWarning.remainingSeconds)}
+              </h5>
+              <p className="text-xs text-amber-200">
+                Pongan música o pulsen el botón para continuar la fiesta.
+              </p>
+            </div>
+          </div>
+          {onKeepAlive && (
+            <button
+              onClick={onKeepAlive}
+              className="px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-lg transition-all cursor-pointer flex-shrink-0 active:scale-95"
+            >
+              Mantener Sala
+            </button>
+          )}
         </div>
       )}
 

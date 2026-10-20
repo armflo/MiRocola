@@ -146,6 +146,7 @@ export interface RoomState {
   users: User[];
   skipVotes: string[]; // user IDs who voted to skip current song
   requiredSkipVotes: number;
+  lastActivityAt?: number;
 }
 
 export interface ChatMessage {
@@ -206,6 +207,9 @@ export interface ServerToClientEvents {
   'soundboard:played': (event: SoundboardEvent) => void;
   'skip:update': (skipVotes: string[], required: number) => void;
   'host:changed': (newHost: User) => void;
+  'inactivity:warning': (data: { remainingSeconds: number; message: string }) => void;
+  'inactivity:cleared': () => void;
+  'room:closed': (data: { reason: string; message: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -213,6 +217,11 @@ export interface ClientToServerEvents {
     payload: { code: string; userName: string; avatar?: string; authUser?: AuthUser },
     callback: (response: { success: boolean; state?: RoomState; error?: string }) => void
   ) => void;
+  'room:reconnect': (
+    payload: { code: string; userId: string; userName: string; avatar?: string },
+    callback: (response: { success: boolean; state?: RoomState; error?: string }) => void
+  ) => void;
+  'room:keepAlive': (callback?: () => void) => void;
   'room:create': (
     payload: {
       roomName: string;

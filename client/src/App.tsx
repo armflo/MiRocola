@@ -7,7 +7,8 @@ import {
   Music,
   ListMusic,
   MessageSquare,
-  Plus
+  Plus,
+  Clock
 } from 'lucide-react';
 import type {
   RoomState,
@@ -22,6 +23,7 @@ import type {
   YouTubeSearchResult,
   AuthUser
 } from '@mirocola/shared';
+import { formatTime } from './lib/utils';
 import { socket, wakeUpBackend } from './services/socket';
 import { authService } from './services/auth';
 import { THEMES } from './lib/theme';
@@ -70,6 +72,12 @@ export const App: React.FC = () => {
   // Soundboard state
   const [isSoundboardMuted, setIsSoundboardMuted] = useState(false);
   const [lastSoundEvent, setLastSoundEvent] = useState<SoundboardEvent | null>(null);
+
+  // Inactivity warning state
+  const [inactivityWarning, setInactivityWarning] = useState<{
+    remainingSeconds: number;
+    message: string;
+  } | null>(null);
 
   // Mobile navigation tab: 'player' | 'queue' | 'chat'
   const [mobileTab, setMobileTab] = useState<'player' | 'queue' | 'chat'>('player');
@@ -175,7 +183,35 @@ export const App: React.FC = () => {
     }
 
     function onRoomError(err: string) {
-      alert(err);
+      const lower = err.toLowerCase();
+      if (
+        lower.includes('no existe') ||
+        lower.includes('no encontrada') ||
+        lower.includes('cerrada') ||
+        lower.includes('no estás conectado')
+      ) {
+        setRoom(null);
+        setCurrentUser(null);
+        setInactivityWarning(null);
+        setLobbyError(err);
+      } else {
+        alert(err);
+      }
+    }
+
+    function onInactivityWarning(data: { remainingSeconds: number; message: string }) {
+      setInactivityWarning(data);
+    }
+
+    function onInactivityCleared() {
+      setInactivityWarning(null);
+    }
+
+    function onRoomClosed(data: { reason: string; message: string }) {
+      setInactivityWarning(null);
+      setRoom(null);
+      setCurrentUser(null);
+      setLobbyError(data.message || 'La sala fue cerrada automáticamente por inactividad.');
     }
 
     socket.on('room:sync', onRoomSync);
@@ -190,6 +226,9 @@ export const App: React.FC = () => {
     socket.on('soundboard:played', onSoundboardPlayed);
     socket.on('host:changed', onHostChanged);
     socket.on('room:error', onRoomError);
+    socket.on('inactivity:warning', onInactivityWarning);
+    socket.on('inactivity:cleared', onInactivityCleared);
+    socket.on('room:closed', onRoomClosed);
 
     return () => {
       socket.off('room:sync', onRoomSync);
@@ -204,8 +243,63 @@ export const App: React.FC = () => {
       socket.off('soundboard:played', onSoundboardPlayed);
       socket.off('host:changed', onHostChanged);
       socket.off('room:error', onRoomError);
+      socket.off('inactivity:warning', onInactivityWarning);
+      socket.off('inactivity:cleared', onInactivityCleared);
+      socket.off('room:closed', onRoomClosed);
     };
   }, [isSoundboardMuted]);
+
+  // Local 1-second countdown when room inactivity warning is active
+  useEffect(() => {
+    if (!inactivityWarning) return;
+
+    const timer = setInterval(() => {
+      setInactivityWarning((prev) => {
+        if (!prev) return null;
+        if (prev.remainingSeconds <= 1) {
+          setRoom(null);
+          setCurrentUser(null);
+          setLobbyError('La sala fue cerrada automáticamente por inactividad prolongada.');
+          return null;
+        }
+        return { ...prev, remainingSeconds: prev.remainingSeconds - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [inactivityWarning]);
+
+  // Seamless session recovery if socket reconnected after WiFi flickers or mobile sleep
+  useEffect(() => {
+    function handleSocketConnect() {
+      if (room && currentUser) {
+        socket.emit(
+          'room:reconnect',
+          {
+            code: room.code,
+            userId: currentUser.id,
+            userName: currentUser.name,
+            avatar: currentUser.avatar
+          },
+          (res) => {
+            if (res.success && res.state) {
+              setRoom(res.state);
+            } else if (!res.success) {
+              setRoom(null);
+              setCurrentUser(null);
+              setInactivityWarning(null);
+              setLobbyError(res.error || 'La sala ya no existe o fue cerrada por inactividad.');
+            }
+          }
+        );
+      }
+    }
+
+    socket.on('connect', handleSocketConnect);
+    return () => {
+      socket.off('connect', handleSocketConnect);
+    };
+  }, [room?.code, currentUser?.id]);
 
   // Auth handlers
   const handleAuthSuccess = (user: AuthUser) => {
@@ -324,9 +418,23 @@ export const App: React.FC = () => {
     return new Promise((resolve) => {
       socket.emit('queue:add', urlOrQuery, (response) => {
         if (response.success) {
+          setInactivityWarning(null);
           resolve({ success: true });
         } else {
-          resolve({ success: false, error: response.error });
+          const err = response.error || 'Error al agregar canción';
+          const lower = err.toLowerCase();
+          if (
+            lower.includes('no existe') ||
+            lower.includes('no encontrada') ||
+            lower.includes('cerrada') ||
+            lower.includes('no estás conectado')
+          ) {
+            setRoom(null);
+            setCurrentUser(null);
+            setInactivityWarning(null);
+            setLobbyError(err);
+          }
+          resolve({ success: false, error: err });
         }
       });
     });
@@ -490,6 +598,36 @@ export const App: React.FC = () => {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Inactivity Warning Countdown Alert */}
+      {inactivityWarning && (
+        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-lg bg-amber-950/95 border-2 border-amber-500/80 rounded-2xl p-3 sm:p-3.5 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex-shrink-0">
+              <Clock className="w-5 h-5 animate-spin" />
+            </div>
+            <div className="min-w-0 text-left">
+              <div className="flex items-center gap-2">
+                <h5 className="text-xs sm:text-sm font-bold text-white">
+                  ⚠️ Sala Inactiva — Cerrando en {formatTime(inactivityWarning.remainingSeconds)}
+                </h5>
+              </div>
+              <p className="text-[11px] text-amber-200 truncate">
+                Pon música o pulsa el botón para mantenerla abierta.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              socket.emit('room:keepAlive');
+              setInactivityWarning(null);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow transition-all cursor-pointer flex-shrink-0 active:scale-95"
+          >
+            Mantener Sala
+          </button>
         </div>
       )}
 
@@ -769,6 +907,11 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         reactions={reactions}
         lastSoundEvent={lastSoundEvent}
+        inactivityWarning={inactivityWarning}
+        onKeepAlive={() => {
+          socket.emit('room:keepAlive');
+          setInactivityWarning(null);
+        }}
         onPlay={() => handlePlay()}
         onPause={() => handlePause()}
         onNext={handleNext}

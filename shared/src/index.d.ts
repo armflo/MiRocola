@@ -119,6 +119,7 @@ export interface RoomState {
     users: User[];
     skipVotes: string[];
     requiredSkipVotes: number;
+    lastActivityAt?: number;
 }
 export interface ChatMessage {
     id: string;
@@ -172,6 +173,15 @@ export interface ServerToClientEvents {
     'soundboard:played': (event: SoundboardEvent) => void;
     'skip:update': (skipVotes: string[], required: number) => void;
     'host:changed': (newHost: User) => void;
+    'inactivity:warning': (data: {
+        remainingSeconds: number;
+        message: string;
+    }) => void;
+    'inactivity:cleared': () => void;
+    'room:closed': (data: {
+        reason: string;
+        message: string;
+    }) => void;
 }
 export interface ClientToServerEvents {
     'room:join': (payload: {
@@ -184,6 +194,17 @@ export interface ClientToServerEvents {
         state?: RoomState;
         error?: string;
     }) => void) => void;
+    'room:reconnect': (payload: {
+        code: string;
+        userId: string;
+        userName: string;
+        avatar?: string;
+    }, callback: (response: {
+        success: boolean;
+        state?: RoomState;
+        error?: string;
+    }) => void) => void;
+    'room:keepAlive': (callback?: () => void) => void;
     'room:create': (payload: {
         roomName: string;
         userName: string;

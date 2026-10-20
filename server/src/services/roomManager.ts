@@ -23,14 +23,37 @@ export class RoomManager {
   private rooms: Map<string, RoomState> = new Map();
   private socketSessions: Map<string, SocketSession> = new Map();
   private onPlaybackSync?: (roomCode: string, room: RoomState, autoDjSong?: Song) => void;
+  private onInactivityWarning?: (roomCode: string, remainingSeconds: number, message: string) => void;
+  private onInactivityCleared?: (roomCode: string) => void;
+  private onRoomClosed?: (roomCode: string, message: string) => void;
 
   private constructor() {
-    // Background interval to check song completion
+    // Background interval to check song completion and room inactivity
     setInterval(() => this.checkPlaybackProgress(), 1000);
   }
 
   public setPlaybackSyncCallback(cb: (roomCode: string, room: RoomState, autoDjSong?: Song) => void) {
     this.onPlaybackSync = cb;
+  }
+
+  public setInactivityCallbacks(
+    onWarning: (roomCode: string, remainingSeconds: number, message: string) => void,
+    onCleared: (roomCode: string) => void,
+    onClosed: (roomCode: string, message: string) => void
+  ) {
+    this.onInactivityWarning = onWarning;
+    this.onInactivityCleared = onCleared;
+    this.onRoomClosed = onClosed;
+  }
+
+  public recordActivity(code: string) {
+    const room = this.getRoom(code);
+    if (!room) return;
+    const wasInactive = room.lastActivityAt && Date.now() - room.lastActivityAt > 15 * 60 * 1000;
+    room.lastActivityAt = Date.now();
+    if (wasInactive && this.onInactivityCleared) {
+      this.onInactivityCleared(room.code);
+    }
   }
 
   public static getInstance(): RoomManager {
@@ -103,7 +126,8 @@ export class RoomManager {
       history: [],
       users: [user],
       skipVotes: [],
-      requiredSkipVotes: 1
+      requiredSkipVotes: 1,
+      lastActivityAt: Date.now()
     };
 
     this.rooms.set(code, roomState);
@@ -158,8 +182,49 @@ export class RoomManager {
 
     room.users.push(user);
     this.updateSkipRequirement(room);
+    this.recordActivity(formattedCode);
 
     this.socketSessions.set(socketId, { socketId, userId, roomCode: formattedCode });
+
+    return { room, user };
+  }
+
+  /**
+   * Reconnect a user after brief disconnection (e.g. WiFi switch, background mobile tab)
+   */
+  public reconnectUser(
+    code: string,
+    userId: string,
+    userName: string,
+    avatar: string,
+    socketId: string
+  ): { room: RoomState; user: User } {
+    const formattedCode = code.toUpperCase().trim();
+    const room = this.rooms.get(formattedCode);
+
+    if (!room) {
+      throw new Error(`La sala "${formattedCode}" ya no existe o fue cerrada por inactividad.`);
+    }
+
+    this.recordActivity(formattedCode);
+
+    let user = room.users.find((u) => u.id === userId);
+    if (!user) {
+      user = {
+        id: userId,
+        name: userName || 'Invitado',
+        avatar: avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
+        isHost: room.users.length === 0, // Restore as host if room was empty
+        joinedAt: Date.now()
+      };
+      room.users.push(user);
+      if (user.isHost) {
+        room.hostId = user.id;
+      }
+    }
+
+    this.socketSessions.set(socketId, { socketId, userId, roomCode: formattedCode });
+    this.updateSkipRequirement(room);
 
     return { room, user };
   }
@@ -191,7 +256,7 @@ export class RoomManager {
       newHost = room.users[0];
     }
 
-    // If room is empty, keep alive for 10 minutes then cleanup
+    // If room is empty, keep alive for 20 minutes then cleanup
     if (room.users.length === 0) {
       setTimeout(() => {
         const check = this.rooms.get(room.code);
@@ -199,7 +264,7 @@ export class RoomManager {
           this.rooms.delete(room.code);
           console.log(`[Room Clean] Room ${room.code} cleaned from memory.`);
         }
-      }, 10 * 60 * 1000);
+      }, 20 * 60 * 1000);
     }
 
     return { room, disconnectedUser, newHost };
@@ -234,6 +299,7 @@ export class RoomManager {
     };
 
     this.updateSkipRequirement(room);
+    this.recordActivity(code);
     return room;
   }
 
@@ -324,6 +390,7 @@ export class RoomManager {
       room.queue.push(song);
     }
 
+    this.recordActivity(code);
     return { room, song };
   }
 
@@ -346,6 +413,7 @@ export class RoomManager {
     }
 
     room.queue.splice(songIndex, 1);
+    this.recordActivity(code);
     return room;
   }
 
@@ -383,6 +451,7 @@ export class RoomManager {
       return a.addedAt - b.addedAt;
     });
 
+    this.recordActivity(code);
     return room;
   }
 
@@ -392,6 +461,8 @@ export class RoomManager {
   public voteSkip(code: string, userId: string): { room: RoomState; skipped: boolean } {
     const room = this.getRoom(code);
     if (!room || !room.playback.currentSong) return { room: room!, skipped: false };
+
+    this.recordActivity(code);
 
     if (!room.skipVotes.includes(userId)) {
       room.skipVotes.push(userId);
@@ -420,6 +491,7 @@ export class RoomManager {
       room.playback.currentTime = currentTime;
     }
     room.playback.timestamp = Date.now();
+    this.recordActivity(code);
 
     return room;
   }
@@ -441,6 +513,7 @@ export class RoomManager {
       room.playback.currentTime += elapsed;
     }
     room.playback.timestamp = Date.now();
+    this.recordActivity(code);
 
     return room;
   }
@@ -455,6 +528,7 @@ export class RoomManager {
 
     room.playback.currentTime = Math.max(0, time);
     room.playback.timestamp = Date.now();
+    this.recordActivity(code);
 
     return room;
   }
@@ -469,6 +543,8 @@ export class RoomManager {
     if (userId) {
       this.assertPlaybackControl(room, userId);
     }
+
+    this.recordActivity(code);
 
     room.skipVotes = [];
 
@@ -573,11 +649,46 @@ export class RoomManager {
   }
 
   /**
-   * Periodic check: auto-advance when a song with known duration finishes
+   * Periodic check: auto-advance when a song with known duration finishes,
+   * and monitor room inactivity (warning countdown at 15m, auto-close at 20m of total silence)
    */
   private checkPlaybackProgress() {
     const now = Date.now();
     for (const room of this.rooms.values()) {
+      // 1. Inactivity tracking
+      if (room.playback.isPlaying && room.playback.currentSong) {
+        // As long as music is playing, the room is active!
+        room.lastActivityAt = now;
+      } else {
+        // Inactive silence (empty queue or paused)
+        const lastAct = room.lastActivityAt || now;
+        const idleMs = now - lastAct;
+        const WARNING_MS = 15 * 60 * 1000; // 15 mins
+        const TIMEOUT_MS = 20 * 60 * 1000; // 20 mins
+
+        if (idleMs >= TIMEOUT_MS) {
+          console.log(`[Room Manager] Room ${room.code} closed due to 20m inactivity.`);
+          if (this.onRoomClosed) {
+            this.onRoomClosed(
+              room.code,
+              'La sala fue cerrada automáticamente tras 20 minutos de inactividad.'
+            );
+          }
+          this.rooms.delete(room.code);
+          continue;
+        } else if (idleMs >= WARNING_MS) {
+          const remainingSecs = Math.max(1, Math.round((TIMEOUT_MS - idleMs) / 1000));
+          if (this.onInactivityWarning) {
+            this.onInactivityWarning(
+              room.code,
+              remainingSecs,
+              `Esta sala se cerrará automáticamente en ${Math.floor(remainingSecs / 60)}m ${remainingSecs % 60}s por inactividad.`
+            );
+          }
+        }
+      }
+
+      // 2. Playback progress checking
       if (!room.playback.isPlaying || !room.playback.currentSong) continue;
 
       const duration = room.playback.currentSong.durationSeconds;

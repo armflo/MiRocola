@@ -34,6 +34,19 @@ export function setupSocketHandlers(io: TypedServer) {
     }
   });
 
+  // Room inactivity warning, clear, and auto-close callbacks
+  roomManager.setInactivityCallbacks(
+    (roomCode, remainingSeconds, message) => {
+      io.to(roomCode).emit('inactivity:warning', { remainingSeconds, message });
+    },
+    (roomCode) => {
+      io.to(roomCode).emit('inactivity:cleared');
+    },
+    (roomCode, message) => {
+      io.to(roomCode).emit('room:closed', { reason: 'inactivity', message });
+    }
+  );
+
   io.on('connection', (socket: TypedSocket) => {
     // 1. Create Room
     socket.on('room:create', async (payload, callback) => {
@@ -93,6 +106,39 @@ export function setupSocketHandlers(io: TypedServer) {
         io.to(room.code).emit('chat:message', joinMsg);
       } catch (err: any) {
         callback({ success: false, error: err.message || 'Error al unirse a la sala' });
+      }
+    });
+
+    // 2.1 Reconnect Room (Session restore after connection flicker)
+    socket.on('room:reconnect', (payload, callback) => {
+      try {
+        const { room, user } = roomManager.reconnectUser(
+          payload.code,
+          payload.userId,
+          payload.userName,
+          payload.avatar || '',
+          socket.id
+        );
+
+        socket.join(room.code);
+        callback({ success: true, state: room });
+        io.to(room.code).emit('users:update', room.users);
+      } catch (err: any) {
+        callback({ success: false, error: err.message || 'La sala ya no está disponible' });
+      }
+    });
+
+    // 2.2 Keep Room Alive (Reset Inactivity timer)
+    socket.on('room:keepAlive', (callback) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (session) {
+          roomManager.recordActivity(session.roomCode);
+          io.to(session.roomCode).emit('inactivity:cleared');
+        }
+        if (typeof callback === 'function') callback();
+      } catch {
+        // Ignore silent fail
       }
     });
 
@@ -278,6 +324,7 @@ export function setupSocketHandlers(io: TypedServer) {
           timestamp: Date.now()
         };
 
+        roomManager.recordActivity(roomCode);
         io.to(roomCode).emit('chat:message', message);
       } catch (err: any) {
         socket.emit('room:error', err.message);
@@ -301,6 +348,7 @@ export function setupSocketHandlers(io: TypedServer) {
           timestamp: Date.now()
         };
 
+        roomManager.recordActivity(roomCode);
         io.to(roomCode).emit('reaction:new', reaction);
       } catch (err: any) {
         socket.emit('room:error', err.message);
@@ -325,6 +373,7 @@ export function setupSocketHandlers(io: TypedServer) {
           timestamp: Date.now()
         };
 
+        roomManager.recordActivity(roomCode);
         io.to(roomCode).emit('soundboard:played', event);
       } catch (err: any) {
         socket.emit('room:error', err.message);
