@@ -30,6 +30,18 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   const [roomCode, setRoomCode] = useState('');
   const [roomMode, setRoomMode] = useState<RoomMode>('COLLABORATIVE');
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
+  const [slowConnecting, setSlowConnecting] = useState(false);
+
+  // Monitor loading time to display friendly Render wake-up hint
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+      timer = setTimeout(() => setSlowConnecting(true), 2500);
+    } else {
+      setSlowConnecting(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   // If authUser changes or is loaded, prefill username if empty
   useEffect(() => {
@@ -355,7 +367,12 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
             className="w-full mt-2 py-3 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="text-xs">
+                  {slowConnecting ? 'Despertando servidor...' : 'Conectando...'}
+                </span>
+              </div>
             ) : (
               <>
                 <span>{tab === 'create' ? 'Crear Rocola' : 'Entrar a la Rocola'}</span>
@@ -363,6 +380,12 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
               </>
             )}
           </button>
+
+          {slowConnecting && (
+            <p className="text-[11px] text-amber-300 text-center animate-pulse leading-snug px-2">
+              ⏳ El servidor gratuito de Render se suspende tras inactividad. Se está iniciando el contenedor (toma ~25-30s la primera vez)...
+            </p>
+          )}
         </form>
       </div>
 

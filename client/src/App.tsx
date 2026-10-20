@@ -22,7 +22,7 @@ import type {
   YouTubeSearchResult,
   AuthUser
 } from '@mirocola/shared';
-import { socket } from './services/socket';
+import { socket, wakeUpBackend } from './services/socket';
 import { authService } from './services/auth';
 import { THEMES } from './lib/theme';
 import { playSoundEffect, SOUND_EFFECTS } from './lib/soundboard';
@@ -72,8 +72,11 @@ export const App: React.FC = () => {
   // Mobile navigation tab: 'player' | 'queue' | 'chat'
   const [mobileTab, setMobileTab] = useState<'player' | 'queue' | 'chat'>('player');
 
-  // Verify and refresh session on mount & check for playlist param
+  // Verify and refresh session on mount, wake up backend & check for playlist param
   useEffect(() => {
+    // Pre-warm backend and socket connection in background immediately
+    wakeUpBackend();
+
     if (authService.hasSession()) {
       authService.getMe().then((user) => {
         if (user) {
