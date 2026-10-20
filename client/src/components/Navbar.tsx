@@ -9,7 +9,8 @@ import {
   Settings,
   Lock,
   QrCode,
-  Sparkles
+  Sparkles,
+  Tv
 } from 'lucide-react';
 import type { RoomState, User, AuthUser } from '@mirocola/shared';
 import type { ThemeConfig } from '../lib/theme';
@@ -22,6 +23,7 @@ interface NavbarProps {
   onOpenUsers: () => void;
   onOpenSettings?: () => void;
   onOpenQR?: () => void;
+  onOpenTvMode?: () => void;
   onOpenAuth?: () => void;
   onOpenProfile?: () => void;
   onLeaveRoom: () => void;
@@ -35,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUsers,
   onOpenSettings,
   onOpenQR,
+  onOpenTvMode,
   onOpenAuth,
   onOpenProfile,
   onLeaveRoom
@@ -116,6 +119,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="p-2 rounded-lg bg-slate-900/90 hover:bg-purple-950/60 border border-purple-800/40 text-pink-400 hover:text-white transition-colors cursor-pointer"
               >
                 <QrCode className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* TV Mode button for Big Screen / Parties */}
+            {onOpenTvMode && (
+              <button
+                onClick={onOpenTvMode}
+                title="Modo TV / Proyector para Fiestas (Pantalla gigante con QR)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-950/70 to-pink-950/70 hover:from-purple-900/80 hover:to-pink-900/80 border border-pink-500/40 text-pink-300 hover:text-white transition-all cursor-pointer shadow-sm group"
+              >
+                <Tv className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-bold hidden md:inline">Modo TV</span>
               </button>
             )}
 
@@ -249,6 +264,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="p-1.5 rounded-lg bg-slate-900 border border-purple-900/40 text-pink-400 active:bg-purple-950/60"
                 >
                   <QrCode className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* TV Mode Button */}
+              {onOpenTvMode && (
+                <button
+                  onClick={onOpenTvMode}
+                  title="Modo TV / Pantalla Completa"
+                  className="p-1.5 rounded-lg bg-gradient-to-r from-purple-950 to-pink-950 border border-pink-500/40 text-pink-400 active:bg-purple-900"
+                >
+                  <Tv className="w-3.5 h-3.5" />
                 </button>
               )}
 

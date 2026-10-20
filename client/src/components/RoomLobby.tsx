@@ -1,7 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Disc3, Sparkles, ArrowRight, ShieldCheck, HeartHandshake, LogIn } from 'lucide-react';
+import {
+  Users,
+  Disc3,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  HeartHandshake,
+  LogIn,
+  Radio,
+  RefreshCw,
+  Music2,
+  Play
+} from 'lucide-react';
 import type { RoomMode, AuthUser } from '@mirocola/shared';
 import { getDjRank } from '../lib/djRank';
+import { BACKEND_URL } from '../services/socket';
+
+interface PublicRoomItem {
+  code: string;
+  name: string;
+  userCount: number;
+  currentSong: {
+    title: string;
+    channelTitle: string;
+    thumbnail: string;
+  } | null;
+  mode: RoomMode;
+}
 
 interface RoomLobbyProps {
   onCreateRoom: (roomName: string, userName: string, avatar: string, mode: RoomMode) => void;
@@ -31,6 +56,31 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   const [roomMode, setRoomMode] = useState<RoomMode>('COLLABORATIVE');
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [slowConnecting, setSlowConnecting] = useState(false);
+  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+
+  const fetchPublicRooms = async () => {
+    setIsLoadingRooms(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/rooms`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.rooms)) {
+          setPublicRooms(data.rooms);
+        }
+      }
+    } catch {
+      // Quiet fail if server waking up
+    } finally {
+      setIsLoadingRooms(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPublicRooms();
+    const interval = setInterval(fetchPublicRooms, 12000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Monitor loading time to display friendly Render wake-up hint
   useEffect(() => {
@@ -387,6 +437,91 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
             </p>
           )}
         </form>
+      </div>
+
+      {/* Directory of Live Public Rooms */}
+      <div className="w-full max-w-md mt-6 relative z-10">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Salas Activas en Vivo {publicRooms.length > 0 && `(${publicRooms.length})`}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={fetchPublicRooms}
+            disabled={isLoadingRooms}
+            className="p-1 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
+            title="Actualizar lista de salas"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRooms ? 'animate-spin text-pink-400' : ''}`} />
+          </button>
+        </div>
+
+        {publicRooms.length > 0 ? (
+          <div className="space-y-2.5">
+            {publicRooms.map((room) => (
+              <div
+                key={room.code}
+                onClick={() => {
+                  setRoomCode(room.code);
+                  setTab('join');
+                  if (userName.trim()) {
+                    onJoinRoom(room.code, userName.trim(), avatarUrl);
+                  }
+                }}
+                className="group p-3 rounded-2xl bg-slate-900/90 hover:bg-purple-950/40 border border-purple-900/40 hover:border-pink-500/60 shadow-lg backdrop-blur-xl transition-all cursor-pointer flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {room.currentSong?.thumbnail ? (
+                    <img
+                      src={room.currentSong.thumbnail}
+                      alt=""
+                      className="w-11 h-11 rounded-xl object-cover border border-purple-800/40 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl bg-purple-950/80 border border-purple-800/50 flex items-center justify-center text-pink-400 flex-shrink-0">
+                      <Music2 className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-xs font-bold text-white truncate group-hover:text-pink-300 transition-colors">
+                        {room.name}
+                      </h4>
+                      <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-950 text-pink-400 border border-purple-900/50">
+                        {room.code}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {room.currentSong ? room.currentSong.title : 'En silencio esperando temas'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-800/40 flex items-center gap-1">
+                    <Users className="w-3 h-3 text-pink-400" />
+                    {room.userCount}
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-pink-600/80 group-hover:bg-pink-600 text-white flex items-center justify-center shadow transition-all">
+                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-slate-900/50 border border-purple-900/30 text-center text-slate-400 text-xs">
+            <Radio className="w-6 h-6 text-purple-500/70 mx-auto mb-1.5" />
+            <p className="font-medium text-slate-300">No hay salas abiertas en este instante</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              ¡Sé el primero en encender la fiesta creando tu propia sala arriba!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Footer Info */}

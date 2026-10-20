@@ -12,10 +12,13 @@ import {
   Music2,
   Clock,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Mic2
 } from 'lucide-react';
 import type { PlaybackState, User, RoomMode, RoomSettings } from '@mirocola/shared';
 import { formatTime } from '../lib/utils';
+import { AudioVisualizer } from './AudioVisualizer';
+import { KaraokeLyrics } from './KaraokeLyrics';
 
 declare global {
   interface Window {
@@ -62,6 +65,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [showVideo, setShowVideo] = useState(true);
+  const [showKaraoke, setShowKaraoke] = useState(false);
   const [playbackError, setPlaybackError] = useState<{
     code: number;
     title: string;
@@ -365,28 +369,74 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Ambient Audio Visualizer under vinyl */}
+            {currentSong && (
+              <div className="absolute inset-x-0 bottom-0 h-16 opacity-35 pointer-events-none">
+                <AudioVisualizer isPlaying={playback.isPlaying} barCount={44} colorScheme="neon" />
+              </div>
+            )}
           </div>
         )}
 
-        {/* Video Mode Toggle overlay button (top right) */}
+        {/* Karaoke & Video Overlay Buttons (top right) */}
         {currentSong && (
-          <button
-            onClick={() => setShowVideo(!showVideo)}
-            className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/10 text-white text-xs font-semibold flex items-center gap-1.5 transition-all"
-            title={showVideo ? 'Cambiar a modo visualizador' : 'Ver video de YouTube'}
-          >
-            {showVideo ? (
-              <>
-                <VideoOff className="w-3.5 h-3.5 text-pink-400" />
-                <span>Ocultar Video</span>
-              </>
-            ) : (
-              <>
-                <Video className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Ver Video</span>
-              </>
-            )}
-          </button>
+          <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+            {/* Karaoke Toggle Button */}
+            <button
+              onClick={() => setShowKaraoke(!showKaraoke)}
+              className={`px-2.5 py-1.5 rounded-lg backdrop-blur-md border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                showKaraoke
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 border-pink-400 text-white shadow-pink-500/25'
+                  : 'bg-black/60 hover:bg-black/80 border-white/10 text-white'
+              }`}
+              title="Modo Letras / Karaoke Sincronizado"
+            >
+              <Mic2 className="w-3.5 h-3.5 text-pink-300" />
+              <span>Karaoke</span>
+            </button>
+
+            {/* Video Mode Toggle */}
+            <button
+              onClick={() => setShowVideo(!showVideo)}
+              className="px-2.5 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/10 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+              title={showVideo ? 'Cambiar a modo visualizador' : 'Ver video de YouTube'}
+            >
+              {showVideo ? (
+                <>
+                  <VideoOff className="w-3.5 h-3.5 text-pink-400" />
+                  <span className="hidden sm:inline">Ocultar Video</span>
+                </>
+              ) : (
+                <>
+                  <Video className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Ver Video</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Karaoke Overlay Full Stage */}
+        {showKaraoke && currentSong && (
+          <div className="absolute inset-0 z-20">
+            <KaraokeLyrics
+              title={currentSong.title}
+              channelTitle={currentSong.channelTitle}
+              durationSeconds={duration}
+              currentTime={localCurrentTime}
+              isPlaying={playback.isPlaying}
+              onSeek={(time) => {
+                if (canControl) {
+                  onSeek(time);
+                  if (playerRef.current) {
+                    playerRef.current.seekTo(time, true);
+                  }
+                }
+              }}
+              onClose={() => setShowKaraoke(false)}
+            />
+          </div>
         )}
 
         {/* Playback Error Overlay (e.g. Embedding restricted by LatinAutor / Universal / Exceeds duration) */}

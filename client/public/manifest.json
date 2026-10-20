@@ -1,0 +1,18 @@
+{
+  "name": "MiRocola — Salas de Música Colaborativa en Vivo",
+  "short_name": "MiRocola",
+  "description": "Rocola colaborativa en vivo con amigos. Vota canciones, karaoke sincronizado y modo TV para fiestas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#ec4899",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

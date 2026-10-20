@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Check,
   Loader2,
-  Palette
+  Palette,
+  Radio
 } from 'lucide-react';
 import type { RoomSettings, RoomMode, RoomTheme } from '@mirocola/shared';
 import { THEMES } from '../lib/theme';
@@ -358,6 +359,37 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Auto-DJ (La Música Nunca Se Detiene) */}
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/60 to-pink-950/40 border border-pink-500/30 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <Radio className="w-5 h-5 text-pink-400 flex-shrink-0 animate-pulse" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-white">
+                    Auto-DJ: La Música Nunca Se Detiene
+                  </h4>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">
+                    TOP
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Si la cola se vacía, el Auto-DJ selecciona y reproduce temas similares recomendados automáticamente.
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={settings.autoDjEnabled}
+                onChange={(e) =>
+                  setSettings((prev) => ({ ...prev, autoDjEnabled: e.target.checked }))
+                }
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
+            </label>
           </div>
 
           {/* 7. Modo de Sala */}

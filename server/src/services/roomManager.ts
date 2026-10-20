@@ -22,10 +22,15 @@ export class RoomManager {
   private static instance: RoomManager;
   private rooms: Map<string, RoomState> = new Map();
   private socketSessions: Map<string, SocketSession> = new Map();
+  private onPlaybackSync?: (roomCode: string, room: RoomState, autoDjSong?: Song) => void;
 
   private constructor() {
     // Background interval to check song completion
     setInterval(() => this.checkPlaybackProgress(), 1000);
+  }
+
+  public setPlaybackSyncCallback(cb: (roomCode: string, room: RoomState, autoDjSong?: Song) => void) {
+    this.onPlaybackSync = cb;
   }
 
   public static getInstance(): RoomManager {
@@ -582,9 +587,128 @@ export class RoomManager {
 
         // Give a 2-second grace period after duration
         if (currentPos >= duration + 2) {
-          this.nextSong(room.code);
+          const updated = this.nextSong(room.code);
+          if (this.onPlaybackSync) {
+            this.onPlaybackSync(room.code, updated);
+          }
+          if (!updated.playback.currentSong && updated.settings.autoDjEnabled) {
+            this.triggerAutoDj(room.code).then((res) => {
+              if (res && this.onPlaybackSync) {
+                this.onPlaybackSync(room.code, res.room, res.song);
+              }
+            });
+          }
         }
       }
     }
+  }
+
+  /**
+   * Auto-DJ: Automatically search and queue matching music when queue runs dry
+   */
+  public async triggerAutoDj(code: string): Promise<{ room: RoomState; song: Song } | null> {
+    const room = this.getRoom(code);
+    if (!room || !room.settings.autoDjEnabled) return null;
+
+    // Search query inspired by previous song or popular party vibes
+    let query = 'exitos latinos fiesta mix';
+    const recentSong = room.playback.currentSong || (room.history.length > 0 ? room.history[0] : null);
+    if (recentSong) {
+      const cleanTitle = recentSong.title
+        .replace(/(\[.*?\]|\(.*?\)|official|video|audio|lyric|remix|hd|4k)/gi, '')
+        .trim();
+      query = recentSong.channelTitle ? `${recentSong.channelTitle} canciones` : `${cleanTitle} mix`;
+    }
+
+    try {
+      const results = await YouTubeService.searchVideos(query, 10);
+      if (!results || results.length === 0) return null;
+
+      // Filter out songs already played recently or in queue
+      const existingIds = new Set<string>([
+        ...(room.playback.currentSong ? [room.playback.currentSong.youtubeId] : []),
+        ...room.queue.map((s) => s.youtubeId),
+        ...room.history.map((s) => s.youtubeId)
+      ]);
+
+      const candidates = results.filter((r) => {
+        if (existingIds.has(r.youtubeId)) return false;
+        // Avoid ultra short or ultra long compilations
+        if (r.durationSeconds > 0 && (r.durationSeconds < 60 || r.durationSeconds > 600)) {
+          return false;
+        }
+        return true;
+      });
+
+      const chosen = candidates[0] || results[0];
+      if (!chosen) return null;
+
+      const autoDjUser = { id: 'autodj', name: '🤖 Auto-DJ' };
+      const song: Song = {
+        id: `song_autodj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        youtubeId: chosen.youtubeId,
+        url: chosen.url,
+        title: chosen.title,
+        channelTitle: chosen.channelTitle,
+        durationSeconds: chosen.durationSeconds || 180,
+        thumbnail: chosen.thumbnail,
+        addedBy: autoDjUser,
+        addedAt: Date.now(),
+        upvotes: []
+      };
+
+      if (!room.playback.currentSong) {
+        room.playback.currentSong = song;
+        room.playback.isPlaying = true;
+        room.playback.currentTime = 0;
+        room.playback.timestamp = Date.now();
+        room.skipVotes = [];
+        this.recordSongHistory(room.code, song);
+      } else {
+        room.queue.push(song);
+      }
+
+      return { room, song };
+    } catch (err) {
+      console.error(`[Auto-DJ Error for room ${code}]:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Get list of active public rooms for the Lobby Directory
+   */
+  public getPublicRooms() {
+    const list: Array<{
+      code: string;
+      name: string;
+      userCount: number;
+      currentSong: {
+        title: string;
+        channelTitle: string;
+        thumbnail: string;
+      } | null;
+      mode: RoomMode;
+    }> = [];
+
+    for (const room of this.rooms.values()) {
+      if (room.users.length > 0) {
+        list.push({
+          code: room.code,
+          name: room.name,
+          userCount: room.users.length,
+          currentSong: room.playback.currentSong
+            ? {
+                title: room.playback.currentSong.title,
+                channelTitle: room.playback.currentSong.channelTitle,
+                thumbnail: room.playback.currentSong.thumbnail
+              }
+            : null,
+          mode: room.mode
+        });
+      }
+    }
+
+    return list.sort((a, b) => b.userCount - a.userCount);
   }
 }

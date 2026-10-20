@@ -15,6 +15,25 @@ type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 export function setupSocketHandlers(io: TypedServer) {
   const roomManager = RoomManager.getInstance();
 
+  // Background playback auto-advance & Auto-DJ broadcaster
+  roomManager.setPlaybackSyncCallback((roomCode, room, autoDjSong) => {
+    io.to(roomCode).emit('playback:sync', room.playback);
+    io.to(roomCode).emit('queue:update', room.queue);
+    io.to(roomCode).emit('history:update', room.history);
+    io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
+
+    if (autoDjSong) {
+      const autoMsg: ChatMessage = {
+        id: `msg_${Date.now()}`,
+        user: { id: 'autodj', name: '🤖 Auto-DJ', avatar: '' },
+        text: `🎧 ¡La música no para! Auto-DJ eligió: "${autoDjSong.title}"`,
+        timestamp: Date.now(),
+        isSystem: true
+      };
+      io.to(roomCode).emit('chat:message', autoMsg);
+    }
+  });
+
   io.on('connection', (socket: TypedSocket) => {
     // 1. Create Room
     socket.on('room:create', async (payload, callback) => {
@@ -115,7 +134,7 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
-    socket.on('playback:next', () => {
+    socket.on('playback:next', async () => {
       try {
         const { roomCode, userId } = getSession();
         const room = roomManager.nextSong(roomCode, userId);
@@ -123,6 +142,23 @@ export function setupSocketHandlers(io: TypedServer) {
         io.to(roomCode).emit('queue:update', room.queue);
         io.to(roomCode).emit('history:update', room.history);
         io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
+
+        // Auto-DJ fallback when queue empties
+        if (!room.playback.currentSong && room.settings.autoDjEnabled) {
+          const autoRes = await roomManager.triggerAutoDj(roomCode);
+          if (autoRes) {
+            io.to(roomCode).emit('playback:sync', autoRes.room.playback);
+            io.to(roomCode).emit('queue:update', autoRes.room.queue);
+            const autoMsg: ChatMessage = {
+              id: `msg_${Date.now()}`,
+              user: { id: 'autodj', name: '🤖 Auto-DJ', avatar: '' },
+              text: `🎧 ¡La música no para! Auto-DJ eligió: "${autoRes.song.title}"`,
+              timestamp: Date.now(),
+              isSystem: true
+            };
+            io.to(roomCode).emit('chat:message', autoMsg);
+          }
+        }
       } catch (err: any) {
         socket.emit('room:error', err.message);
       }
@@ -179,7 +215,7 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
-    socket.on('queue:voteSkip', () => {
+    socket.on('queue:voteSkip', async () => {
       try {
         const { roomCode, userId } = getSession();
         const { room, skipped } = roomManager.voteSkip(roomCode, userId);
@@ -198,6 +234,23 @@ export function setupSocketHandlers(io: TypedServer) {
             isSystem: true
           };
           io.to(roomCode).emit('chat:message', skipMsg);
+
+          // Auto-DJ fallback when queue empties after skip
+          if (!room.playback.currentSong && room.settings.autoDjEnabled) {
+            const autoRes = await roomManager.triggerAutoDj(roomCode);
+            if (autoRes) {
+              io.to(roomCode).emit('playback:sync', autoRes.room.playback);
+              io.to(roomCode).emit('queue:update', autoRes.room.queue);
+              const autoMsg: ChatMessage = {
+                id: `msg_${Date.now()}`,
+                user: { id: 'autodj', name: '🤖 Auto-DJ', avatar: '' },
+                text: `🎧 Auto-DJ tomó el relevo con: "${autoRes.song.title}"`,
+                timestamp: Date.now(),
+                isSystem: true
+              };
+              io.to(roomCode).emit('chat:message', autoMsg);
+            }
+          }
         } else {
           io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
         }

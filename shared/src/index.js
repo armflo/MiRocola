@@ -9,5 +9,6 @@ exports.DEFAULT_ROOM_SETTINGS = {
     allowDuplicates: false, // no duplicates by default
     allowPlaylists: false, // single songs only
     voteSkipPercentage: 50, // 50% of listeners
-    isQueueLocked: false
+    isQueueLocked: false,
+    autoDjEnabled: true
 };

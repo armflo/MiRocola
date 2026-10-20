@@ -9,6 +9,7 @@ export interface RoomSettings {
     allowPlaylists: boolean;
     voteSkipPercentage: number;
     isQueueLocked: boolean;
+    autoDjEnabled: boolean;
 }
 export declare const DEFAULT_ROOM_SETTINGS: RoomSettings;
 export interface User {

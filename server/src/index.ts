@@ -49,6 +49,16 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
+// Get active public rooms directory for the lobby
+app.get('/api/rooms', (_req: Request, res: Response) => {
+  const roomManager = RoomManager.getInstance();
+  const rooms = roomManager.getPublicRooms();
+  res.json({
+    success: true,
+    rooms
+  });
+});
+
 // Check if a room exists
 app.get('/api/rooms/:code', async (req: Request, res: Response) => {
   const code = String(req.params.code).toUpperCase().trim();

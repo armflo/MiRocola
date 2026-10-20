@@ -40,6 +40,7 @@ import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { SavePlaylistModal } from './components/SavePlaylistModal';
 import { PlaylistViewModal } from './components/PlaylistViewModal';
+import { PartyTvMode } from './components/PartyTvMode';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -64,6 +65,7 @@ export const App: React.FC = () => {
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isTvModeOpen, setIsTvModeOpen] = useState(false);
 
   // Soundboard state
   const [isSoundboardMuted, setIsSoundboardMuted] = useState(false);
@@ -468,6 +470,7 @@ export const App: React.FC = () => {
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenQR={() => setIsQRModalOpen(true)}
+        onOpenTvMode={() => setIsTvModeOpen(true)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onLeaveRoom={handleLeaveRoom}
@@ -756,6 +759,19 @@ export const App: React.FC = () => {
         authUser={authUser}
         onRequireAuth={() => setIsAuthModalOpen(true)}
         onLoadSongsToQueue={handleLoadSongsToQueue}
+      />
+
+      {/* TV / Projector Party Mode */}
+      <PartyTvMode
+        isOpen={isTvModeOpen}
+        onClose={() => setIsTvModeOpen(false)}
+        room={room}
+        currentUser={currentUser}
+        reactions={reactions}
+        lastSoundEvent={lastSoundEvent}
+        onPlay={() => handlePlay()}
+        onPause={() => handlePause()}
+        onNext={handleNext}
       />
     </div>
   );

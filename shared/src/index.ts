@@ -11,6 +11,7 @@ export interface RoomSettings {
   allowPlaylists: boolean; // false = only single songs allowed
   voteSkipPercentage: number; // e.g. 50 (%)
   isQueueLocked: boolean; // true = no new songs can be added
+  autoDjEnabled: boolean; // true = Auto-DJ picks songs when queue is empty
 }
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
@@ -21,7 +22,8 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   allowDuplicates: false, // no duplicates by default
   allowPlaylists: false, // single songs only
   voteSkipPercentage: 50, // 50% of listeners
-  isQueueLocked: false
+  isQueueLocked: false,
+  autoDjEnabled: true
 };
 
 export interface User {
