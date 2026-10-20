@@ -19,9 +19,11 @@ import type {
   RoomSettings,
   SoundEffectId,
   SoundboardEvent,
-  YouTubeSearchResult
+  YouTubeSearchResult,
+  AuthUser
 } from '@mirocola/shared';
 import { socket } from './services/socket';
+import { authService } from './services/auth';
 import { THEMES } from './lib/theme';
 import { playSoundEffect, SOUND_EFFECTS } from './lib/soundboard';
 import { Navbar } from './components/Navbar';
@@ -34,6 +36,10 @@ import { UserListModal } from './components/UserListModal';
 import { RoomSettingsModal } from './components/RoomSettingsModal';
 import { QRCodeModal } from './components/QRCodeModal';
 import { Soundboard } from './components/Soundboard';
+import { AuthModal } from './components/AuthModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { SavePlaylistModal } from './components/SavePlaylistModal';
+import { PlaylistViewModal } from './components/PlaylistViewModal';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -42,6 +48,16 @@ export const App: React.FC = () => {
   const [reactions, setReactions] = useState<ReactionEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
+
+  // User Auth & Profile state
+  const [authUser, setAuthUser] = useState<AuthUser | null>(authService.getStoredUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // Playlists state
+  const [isSavePlaylistOpen, setIsSavePlaylistOpen] = useState(false);
+  const [songsToSave, setSongsToSave] = useState<Song[]>([]);
+  const [activePlaylistSlug, setActivePlaylistSlug] = useState<string | null>(null);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -55,6 +71,23 @@ export const App: React.FC = () => {
 
   // Mobile navigation tab: 'player' | 'queue' | 'chat'
   const [mobileTab, setMobileTab] = useState<'player' | 'queue' | 'chat'>('player');
+
+  // Verify and refresh session on mount & check for playlist param
+  useEffect(() => {
+    if (authService.hasSession()) {
+      authService.getMe().then((user) => {
+        if (user) {
+          setAuthUser(user);
+        }
+      });
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const plParam = params.get('playlist') || params.get('p');
+    if (plParam) {
+      setActivePlaylistSlug(plParam);
+    }
+  }, []);
 
   // Socket event listeners
   useEffect(() => {
@@ -76,6 +109,17 @@ export const App: React.FC = () => {
 
     function onUsersUpdate(users: User[]) {
       setRoom((prev) => (prev ? { ...prev, users } : prev));
+      // Reactively sync DJ Score if current user is logged in
+      setAuthUser((prev) => {
+        if (!prev) return prev;
+        const me = users.find((u) => u.persistentId === prev.id);
+        if (me && typeof me.djScore === 'number' && me.djScore !== prev.djScore) {
+          const updated = { ...prev, djScore: me.djScore };
+          authService.saveSession(authService.getToken() || '', updated);
+          return updated;
+        }
+        return prev;
+      });
     }
 
     function onSkipUpdate(skipVotes: string[], required: number) {
@@ -158,6 +202,33 @@ export const App: React.FC = () => {
     };
   }, [isSoundboardMuted]);
 
+  // Auth handlers
+  const handleAuthSuccess = (user: AuthUser) => {
+    setAuthUser(user);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setAuthUser(null);
+    setIsProfileModalOpen(false);
+  };
+
+  const handlePlaylistCreated = () => {
+    // Award +25 DJ points locally so profile updates instantly
+    setAuthUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, djScore: prev.djScore + 25 };
+      authService.saveSession(authService.getToken() || '', updated);
+      return updated;
+    });
+  };
+
+  const handleLoadSongsToQueue = async (urls: string[]) => {
+    for (const url of urls) {
+      await handleAddSong(url);
+    }
+  };
+
   // 1. Create Room handler
   const handleCreateRoom = (
     roomName: string,
@@ -174,7 +245,7 @@ export const App: React.FC = () => {
 
     socket.emit(
       'room:create',
-      { roomName, userName, avatar, mode },
+      { roomName, userName, avatar, mode, authUser: authUser || undefined },
       (response) => {
         setIsLoading(false);
         if (response.success && response.state) {
@@ -203,7 +274,7 @@ export const App: React.FC = () => {
       socket.connect();
     }
 
-    socket.emit('room:join', { code, userName, avatar }, (response) => {
+    socket.emit('room:join', { code, userName, avatar, authUser: authUser || undefined }, (response) => {
       setIsLoading(false);
       if (response.success && response.state) {
         setRoom(response.state);
@@ -317,12 +388,46 @@ export const App: React.FC = () => {
   // If not joined to any room, show Lobby
   if (!room) {
     return (
-      <RoomLobby
-        onCreateRoom={handleCreateRoom}
-        onJoinRoom={handleJoinRoom}
-        isLoading={isLoading}
-        error={lobbyError}
-      />
+      <>
+        <RoomLobby
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          isLoading={isLoading}
+          error={lobbyError}
+          authUser={authUser}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
+        />
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={handleAuthSuccess}
+        />
+
+        {authUser && (
+          <UserProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            authUser={authUser}
+            onUpdateUser={(updated) => setAuthUser(updated)}
+            onLogout={handleLogout}
+            onOpenPlaylist={(slug) => {
+              setIsProfileModalOpen(false);
+              setActivePlaylistSlug(slug);
+            }}
+          />
+        )}
+
+        <PlaylistViewModal
+          isOpen={!!activePlaylistSlug}
+          onClose={() => setActivePlaylistSlug(null)}
+          playlistIdOrSlug={activePlaylistSlug}
+          authUser={authUser}
+          onRequireAuth={() => setIsAuthModalOpen(true)}
+          onLoadSongsToQueue={undefined}
+        />
+      </>
     );
   }
 
@@ -345,9 +450,12 @@ export const App: React.FC = () => {
       <Navbar
         room={room}
         currentUser={currentUser}
+        authUser={authUser}
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenQR={() => setIsQRModalOpen(true)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
         onLeaveRoom={handleLeaveRoom}
       />
 
@@ -424,6 +532,10 @@ export const App: React.FC = () => {
               onRemove={handleRemoveSong}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onAddSong={handleAddSong}
+              onOpenSavePlaylist={(songs) => {
+                setSongsToSave(songs);
+                setIsSavePlaylistOpen(true);
+              }}
             />
           </div>
 
@@ -589,6 +701,48 @@ export const App: React.FC = () => {
           onUpdateMode={handleUpdateMode}
         />
       )}
+
+      {/* Auth Modal (Register / Login) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      {/* User Profile & DJ Score Modal */}
+      {authUser && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          authUser={authUser}
+          onUpdateUser={(updated) => setAuthUser(updated)}
+          onLogout={handleLogout}
+          onOpenPlaylist={(slug) => {
+            setIsProfileModalOpen(false);
+            setActivePlaylistSlug(slug);
+          }}
+        />
+      )}
+
+      {/* Save Playlist Modal */}
+      <SavePlaylistModal
+        isOpen={isSavePlaylistOpen}
+        onClose={() => setIsSavePlaylistOpen(false)}
+        songs={songsToSave}
+        authUser={authUser}
+        onRequireAuth={() => setIsAuthModalOpen(true)}
+        onPlaylistCreated={handlePlaylistCreated}
+      />
+
+      {/* Playlist View / Social Modal */}
+      <PlaylistViewModal
+        isOpen={!!activePlaylistSlug}
+        onClose={() => setActivePlaylistSlug(null)}
+        playlistIdOrSlug={activePlaylistSlug}
+        authUser={authUser}
+        onRequireAuth={() => setIsAuthModalOpen(true)}
+        onLoadSongsToQueue={handleLoadSongsToQueue}
+      />
     </div>
   );
 };

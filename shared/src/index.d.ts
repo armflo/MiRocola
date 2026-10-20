@@ -17,6 +17,72 @@ export interface User {
     avatar: string;
     isHost: boolean;
     joinedAt: number;
+    persistentId?: number;
+    djScore?: number;
+    username?: string;
+}
+export interface AuthUser {
+    id: number;
+    email: string;
+    username: string;
+    avatar: string;
+    bio?: string | null;
+    djScore: number;
+    createdAt: string;
+}
+export interface AuthResponse {
+    success: boolean;
+    user?: AuthUser;
+    token?: string;
+    error?: string;
+}
+export interface RegisterPayload {
+    email: string;
+    username: string;
+    password: string;
+    avatar?: string;
+    bio?: string;
+}
+export interface LoginPayload {
+    emailOrUsername: string;
+    password: string;
+}
+export interface UpdateProfilePayload {
+    username?: string;
+    avatar?: string;
+    bio?: string;
+}
+export interface PlaylistSongDto {
+    id?: number;
+    youtubeId: string;
+    title: string;
+    channelTitle: string;
+    thumbnail: string;
+    duration: number;
+    orderIndex?: number;
+}
+export interface PlaylistDto {
+    id: number;
+    userId: number;
+    authorName: string;
+    authorAvatar: string;
+    title: string;
+    description?: string | null;
+    slug: string;
+    isPublic: boolean;
+    likesCount: number;
+    hasLiked?: boolean;
+    songsCount: number;
+    songs?: PlaylistSongDto[];
+    createdAt: string;
+}
+export interface CommentDto {
+    id: number;
+    userId: number;
+    username: string;
+    avatar: string;
+    content: string;
+    createdAt: string;
 }
 export interface Song {
     id: string;
@@ -111,6 +177,7 @@ export interface ClientToServerEvents {
         code: string;
         userName: string;
         avatar?: string;
+        authUser?: AuthUser;
     }, callback: (response: {
         success: boolean;
         state?: RoomState;
@@ -122,6 +189,7 @@ export interface ClientToServerEvents {
         avatar?: string;
         mode?: RoomMode;
         settings?: Partial<RoomSettings>;
+        authUser?: AuthUser;
     }, callback: (response: {
         success: boolean;
         code?: string;

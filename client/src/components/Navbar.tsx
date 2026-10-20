@@ -1,23 +1,39 @@
 import React, { useState } from 'react';
-import { Radio, Copy, Check, Users, Shield, LogOut, Settings, Lock, QrCode } from 'lucide-react';
-import type { RoomState, User } from '@mirocola/shared';
+import {
+  Radio,
+  Copy,
+  Check,
+  Users,
+  Shield,
+  LogOut,
+  Settings,
+  Lock,
+  QrCode,
+  Sparkles
+} from 'lucide-react';
+import type { RoomState, User, AuthUser } from '@mirocola/shared';
 
 interface NavbarProps {
   room: RoomState;
   currentUser: User | null;
+  authUser?: AuthUser | null;
   onOpenUsers: () => void;
   onOpenSettings?: () => void;
   onOpenQR?: () => void;
+  onOpenAuth?: () => void;
+  onOpenProfile?: () => void;
   onLeaveRoom: () => void;
 }
-
 
 export const Navbar: React.FC<NavbarProps> = ({
   room,
   currentUser,
+  authUser,
   onOpenUsers,
   onOpenSettings,
   onOpenQR,
+  onOpenAuth,
+  onOpenProfile,
   onLeaveRoom
 }) => {
   const [copied, setCopied] = useState(false);
@@ -116,13 +132,43 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* User Avatar badge */}
-            {currentUser && (
+            {/* User Profile badge (Registered User vs Guest) */}
+            {authUser ? (
+              <button
+                onClick={onOpenProfile}
+                title="Ver mi perfil y DJ Score"
+                className="flex items-center gap-2 pl-2 border-l border-slate-800 hover:opacity-90 cursor-pointer text-left transition-opacity"
+              >
+                <div className="relative">
+                  <img
+                    src={authUser.avatar}
+                    alt={authUser.username}
+                    className="w-8 h-8 rounded-full border border-pink-500/70 bg-slate-800 object-cover"
+                  />
+                  <span className="absolute -bottom-1 -right-1 text-[10px] leading-none">
+                    ⭐
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white leading-none flex items-center gap-1">
+                    @{authUser.username}
+                    {currentUser?.isHost && (
+                      <span title="Anfitrión de la sala">
+                        <Shield className="w-3 h-3 text-amber-400" />
+                      </span>
+                    )}
+                  </p>
+                  <span className="text-[10px] text-amber-300 font-bold">
+                    {authUser.djScore} pts
+                  </span>
+                </div>
+              </button>
+            ) : currentUser ? (
               <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
                 <img
                   src={currentUser.avatar}
                   alt={currentUser.name}
-                  className="w-8 h-8 rounded-full border border-purple-500/40 bg-slate-800"
+                  className="w-8 h-8 rounded-full border border-purple-500/40 bg-slate-800 object-cover"
                 />
                 <div className="text-left">
                   <p className="text-xs font-semibold text-slate-200 leading-none flex items-center gap-1">
@@ -133,12 +179,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     )}
                   </p>
-                  <span className="text-[10px] text-purple-400 font-medium">
-                    {currentUser.isHost ? 'DJ Anfitrión' : 'Oyente'}
-                  </span>
+                  {onOpenAuth ? (
+                    <button
+                      onClick={onOpenAuth}
+                      className="text-[10px] text-pink-400 hover:text-pink-300 font-semibold cursor-pointer underline flex items-center gap-0.5"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>Crear Cuenta</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-purple-400 font-medium">
+                      {currentUser.isHost ? 'DJ Anfitrión' : 'Oyente'}
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Leave Button */}
             <button
@@ -208,6 +264,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-pink-500 animate-ping" />
                 </button>
               )}
+
+              {/* Auth / Profile Button on Mobile */}
+              {authUser && onOpenProfile ? (
+                <button
+                  onClick={onOpenProfile}
+                  title="Mi Perfil DJ"
+                  className="p-1 rounded-lg bg-slate-900 border border-pink-500/50 flex items-center gap-1 active:scale-95 cursor-pointer"
+                >
+                  <img
+                    src={authUser.avatar}
+                    alt=""
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                  <span className="text-[10px] text-amber-300 font-bold hidden sm:inline">
+                    ⭐{authUser.djScore}
+                  </span>
+                </button>
+              ) : onOpenAuth ? (
+                <button
+                  onClick={onOpenAuth}
+                  title="Crear Cuenta Gratis"
+                  className="p-1 px-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold flex items-center gap-0.5 active:scale-95 cursor-pointer"
+                >
+                  <Sparkles className="w-2.5 h-2.5" />
+                  <span>Cuenta</span>
+                </button>
+              ) : null}
 
               {/* Leave Button */}
               <button

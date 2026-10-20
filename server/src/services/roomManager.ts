@@ -5,10 +5,12 @@ import {
   RoomMode,
   PlaybackState,
   RoomSettings,
-  DEFAULT_ROOM_SETTINGS
+  DEFAULT_ROOM_SETTINGS,
+  AuthUser
 } from '@mirocola/shared';
 import { prisma } from '../config/db.js';
 import { YouTubeService } from './youtubeService.js';
+import { AuthService } from './authService.js';
 
 interface SocketSession {
   socketId: string;
@@ -54,7 +56,8 @@ export class RoomManager {
     avatar: string,
     mode: RoomMode = 'COLLABORATIVE',
     socketId: string,
-    customSettings?: Partial<RoomSettings>
+    customSettings?: Partial<RoomSettings>,
+    authUser?: AuthUser
   ): Promise<{ room: RoomState; user: User }> {
     let code = this.generateRoomCode();
     while (this.rooms.has(code)) {
@@ -64,10 +67,13 @@ export class RoomManager {
     const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const user: User = {
       id: userId,
-      name: userName.trim() || 'Anfitrión',
-      avatar: avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
+      name: authUser?.username ? `@${authUser.username}` : (userName.trim() || 'Anfitrión'),
+      avatar: authUser?.avatar || avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
       isHost: true,
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      persistentId: authUser?.id,
+      username: authUser?.username,
+      djScore: authUser?.djScore
     };
 
     const settings: RoomSettings = {
@@ -123,7 +129,8 @@ export class RoomManager {
     code: string,
     userName: string,
     avatar: string,
-    socketId: string
+    socketId: string,
+    authUser?: AuthUser
   ): { room: RoomState; user: User } {
     const formattedCode = code.toUpperCase().trim();
     const room = this.rooms.get(formattedCode);
@@ -135,10 +142,13 @@ export class RoomManager {
     const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const user: User = {
       id: userId,
-      name: userName.trim() || 'Invitado',
-      avatar: avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
+      name: authUser?.username ? `@${authUser.username}` : (userName.trim() || 'Invitado'),
+      avatar: authUser?.avatar || avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`,
       isHost: false,
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      persistentId: authUser?.id,
+      username: authUser?.username,
+      djScore: authUser?.djScore
     };
 
     room.users.push(user);
@@ -349,6 +359,15 @@ export class RoomManager {
       song.upvotes.splice(voteIdx, 1); // Toggle off
     } else {
       song.upvotes.push(userId); // Add vote
+
+      // Award +10 DJ Score to the song author if registered
+      const songAuthor = room.users.find((u) => u.id === song.addedBy.id);
+      if (songAuthor?.persistentId) {
+        AuthService.awardDjPoints(songAuthor.persistentId, 10).catch(() => {});
+        if (typeof songAuthor.djScore === 'number') {
+          songAuthor.djScore += 10;
+        }
+      }
     }
 
     // Sort queue: highest upvotes first, then oldest addedAt
@@ -450,9 +469,19 @@ export class RoomManager {
 
     // Save previous playing song to room's played history
     if (room.playback.currentSong) {
-      room.history.unshift({ ...room.playback.currentSong });
+      const prevSong = room.playback.currentSong;
+      room.history.unshift({ ...prevSong });
       if (room.history.length > 50) {
         room.history.pop();
+      }
+
+      // Award +20 DJ Score points for completed playback to registered requester
+      const songAuthor = room.users.find((u) => u.id === prevSong.addedBy.id);
+      if (songAuthor?.persistentId) {
+        AuthService.awardDjPoints(songAuthor.persistentId, 20).catch(() => {});
+        if (typeof songAuthor.djScore === 'number') {
+          songAuthor.djScore += 20;
+        }
       }
     }
 

@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
-import { Users, Disc3, Sparkles, ArrowRight, ShieldCheck, HeartHandshake } from 'lucide-react';
-import type { RoomMode } from '@mirocola/shared';
+import React, { useState, useEffect } from 'react';
+import { Users, Disc3, Sparkles, ArrowRight, ShieldCheck, HeartHandshake, LogIn } from 'lucide-react';
+import type { RoomMode, AuthUser } from '@mirocola/shared';
+import { getDjRank } from '../lib/djRank';
 
 interface RoomLobbyProps {
   onCreateRoom: (roomName: string, userName: string, avatar: string, mode: RoomMode) => void;
   onJoinRoom: (code: string, userName: string, avatar: string) => void;
   isLoading: boolean;
   error?: string | null;
+  authUser?: AuthUser | null;
+  onOpenAuth?: () => void;
+  onOpenProfile?: () => void;
 }
 
 const AVATAR_SEEDS = ['Felix', 'Aneka', 'Milo', 'Luna', 'Zoe', 'Leo', 'Maya', 'Nico'];
@@ -15,17 +19,27 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   onCreateRoom,
   onJoinRoom,
   isLoading,
-  error
+  error,
+  authUser,
+  onOpenAuth,
+  onOpenProfile
 }) => {
   const [tab, setTab] = useState<'create' | 'join'>('create');
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(authUser?.username || '');
   const [roomName, setRoomName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [roomMode, setRoomMode] = useState<RoomMode>('COLLABORATIVE');
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
 
+  // If authUser changes or is loaded, prefill username if empty
+  useEffect(() => {
+    if (authUser?.username && !userName) {
+      setUserName(authUser.username);
+    }
+  }, [authUser]);
+
   // Read ?code=... or ?join=... from URL (e.g. from QR scan)
-  React.useEffect(() => {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codeParam = params.get('code') || params.get('join');
     if (codeParam) {
@@ -34,7 +48,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
     }
   }, []);
 
-  const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedAvatarSeed}`;
+  const avatarUrl = authUser?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedAvatarSeed}`;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,14 +67,42 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
     }
   };
 
+  const rank = authUser ? getDjRank(authUser.djScore) : null;
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden">
       {/* Background glow effects */}
       <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-pink-600/20 rounded-full blur-3xl pointer-events-none" />
 
+      {/* Top Bar for Auth / Profile Access */}
+      <div className="w-full max-w-md flex justify-end mb-3 relative z-10">
+        {authUser ? (
+          <button
+            onClick={onOpenProfile}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-purple-800/50 hover:border-pink-500/60 shadow-lg text-xs font-semibold text-slate-200 cursor-pointer transition-all hover:scale-105"
+          >
+            <img
+              src={authUser.avatar}
+              alt={authUser.username}
+              className="w-5 h-5 rounded-full object-cover border border-pink-400"
+            />
+            <span>@{authUser.username}</span>
+            <span className="text-amber-400 font-bold">⭐ {authUser.djScore}</span>
+          </button>
+        ) : (
+          <button
+            onClick={onOpenAuth}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-700/50 hover:border-pink-500/70 text-xs font-semibold text-purple-200 hover:text-white cursor-pointer transition-all hover:scale-105 shadow-md"
+          >
+            <LogIn className="w-3.5 h-3.5 text-pink-400" />
+            <span>Iniciar Sesión / Registro</span>
+          </button>
+        )}
+      </div>
+
       {/* Hero header */}
-      <div className="text-center mb-8 relative z-10">
+      <div className="text-center mb-6 relative z-10">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/60 border border-purple-800/40 text-purple-300 text-xs font-semibold mb-3">
           <Sparkles className="w-3.5 h-3.5 text-pink-400" />
           Rocola Colaborativa en Tiempo Real
@@ -75,12 +117,64 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
 
       {/* Main Card */}
       <div className="w-full max-w-md bg-slate-900/80 border border-purple-900/50 rounded-2xl shadow-2xl shadow-purple-950/50 backdrop-blur-xl p-6 sm:p-8 relative z-10">
+        {/* Auth Status Banner */}
+        {authUser && rank ? (
+          <div className="mb-5 p-3 rounded-xl bg-gradient-to-r from-purple-950/70 to-pink-950/50 border border-purple-700/40 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src={authUser.avatar}
+                alt={authUser.username}
+                className="w-10 h-10 rounded-full border-2 border-pink-500/80 object-cover flex-shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-bold text-white truncate">
+                    @{authUser.username}
+                  </span>
+                  <span
+                    className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full border bg-gradient-to-r ${rank.badgeClass}`}
+                  >
+                    {rank.emoji} {rank.name}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-300 font-semibold flex items-center gap-1 mt-0.5">
+                  ⭐ {authUser.djScore} puntos de DJ
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="px-2.5 py-1 rounded-lg bg-purple-900/60 hover:bg-purple-800/70 border border-purple-700/50 text-[11px] font-semibold text-purple-200 transition-colors cursor-pointer flex-shrink-0"
+            >
+              Mi Perfil
+            </button>
+          </div>
+        ) : (
+          <div className="mb-5 p-3 rounded-xl bg-purple-950/30 border border-purple-800/40 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-left min-w-0">
+              <Sparkles className="w-4 h-4 text-pink-400 flex-shrink-0 animate-pulse" />
+              <div className="text-[11px] text-slate-300 leading-tight">
+                <span className="font-bold text-white">¿Quieres guardar tus rocolas?</span>
+                <p className="text-slate-400 text-[10px]">Crea una cuenta gratis o juega como invitado.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenAuth}
+              className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[11px] font-bold shadow hover:opacity-95 transition-all cursor-pointer flex-shrink-0"
+            >
+              Crear Cuenta
+            </button>
+          </div>
+        )}
+
         {/* Tab switcher */}
         <div className="grid grid-cols-2 p-1 bg-slate-950/70 rounded-xl border border-purple-900/30 mb-6">
           <button
             type="button"
             onClick={() => setTab('create')}
-            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               tab === 'create'
                 ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
@@ -92,7 +186,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
           <button
             type="button"
             onClick={() => setTab('join')}
-            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               tab === 'join'
                 ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
@@ -111,21 +205,42 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Avatar picker */}
+          {/* Avatar picker (if not logged in, or logged in without custom avatar) */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              Elige tu avatar
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-300">
+                Elige tu avatar
+              </label>
+              {authUser && (
+                <span className="text-[10px] text-pink-400 font-medium">
+                  Avatar de tu cuenta activo
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+              {authUser && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedAvatarSeed(authUser.username)}
+                  className={`relative flex-shrink-0 w-11 h-11 rounded-xl p-0.5 border-2 transition-all cursor-pointer ${
+                    avatarUrl === authUser.avatar
+                      ? 'border-pink-500 bg-pink-950/40 scale-105 shadow-md shadow-pink-500/20'
+                      : 'border-slate-800 bg-slate-900/60 opacity-70'
+                  }`}
+                  title="Tu avatar registrado"
+                >
+                  <img src={authUser.avatar} alt="Registrado" className="w-full h-full rounded-lg object-cover" />
+                </button>
+              )}
               {AVATAR_SEEDS.map((seed) => {
                 const url = `https://api.dicebear.com/7.x/bottts/svg?seed=${seed}`;
-                const isSelected = selectedAvatarSeed === seed;
+                const isSelected = !authUser && selectedAvatarSeed === seed;
                 return (
                   <button
                     key={seed}
                     type="button"
                     onClick={() => setSelectedAvatarSeed(seed)}
-                    className={`relative flex-shrink-0 w-11 h-11 rounded-xl p-0.5 border-2 transition-all ${
+                    className={`relative flex-shrink-0 w-11 h-11 rounded-xl p-0.5 border-2 transition-all cursor-pointer ${
                       isSelected
                         ? 'border-pink-500 bg-pink-950/40 scale-105 shadow-md shadow-pink-500/20'
                         : 'border-slate-800 bg-slate-900/60 hover:border-purple-600/50 opacity-70 hover:opacity-100'
@@ -180,7 +295,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
                   <button
                     type="button"
                     onClick={() => setRoomMode('COLLABORATIVE')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       roomMode === 'COLLABORATIVE'
                         ? 'bg-purple-950/60 border-purple-500 text-purple-200'
                         : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-purple-900/40'
@@ -198,7 +313,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
                   <button
                     type="button"
                     onClick={() => setRoomMode('DJ_ONLY')}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       roomMode === 'DJ_ONLY'
                         ? 'bg-purple-950/60 border-purple-500 text-purple-200'
                         : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-purple-900/40'

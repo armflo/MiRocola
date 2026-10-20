@@ -10,7 +10,8 @@ import {
   History,
   RotateCcw,
   Check,
-  Loader2
+  Loader2,
+  Bookmark
 } from 'lucide-react';
 import { formatTime } from '../lib/utils';
 
@@ -25,6 +26,7 @@ interface SongQueueProps {
   onRemove: (songId: string) => void;
   onOpenAddModal: () => void;
   onAddSong?: (url: string) => Promise<{ success: boolean; error?: string }>;
+  onOpenSavePlaylist?: (songs: Song[]) => void;
 }
 
 export const SongQueue: React.FC<SongQueueProps> = ({
@@ -37,7 +39,8 @@ export const SongQueue: React.FC<SongQueueProps> = ({
   onUpvote,
   onRemove,
   onOpenAddModal,
-  onAddSong
+  onAddSong,
+  onOpenSavePlaylist
 }) => {
   const [activeTab, setActiveTab] = useState<'queue' | 'history'>('queue');
   const [requeuingId, setRequeuingId] = useState<string | null>(null);
@@ -66,6 +69,8 @@ export const SongQueue: React.FC<SongQueueProps> = ({
       setRequeuingId(null);
     }
   };
+
+  const currentTabSongs = activeTab === 'queue' ? queue : history;
 
   return (
     <div className="bg-slate-900/80 border border-purple-900/40 rounded-2xl p-3.5 sm:p-5 shadow-xl backdrop-blur-xl flex flex-col h-full min-h-[440px]">
@@ -116,30 +121,45 @@ export const SongQueue: React.FC<SongQueueProps> = ({
           </button>
         </div>
 
-        {/* Action button: Pedir Canción */}
-        {activeTab === 'queue' && (
-          <button
-            onClick={onOpenAddModal}
-            disabled={isLocked}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all ${
-              isLocked
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
-                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white shadow-purple-600/25 cursor-pointer active:scale-95'
-            }`}
-          >
-            {isLocked ? (
-              <>
-                <Lock className="w-3.5 h-3.5 text-red-400" />
-                <span>Cerrada</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-3.5 h-3.5" />
-                <span>Pedir Tema</span>
-              </>
-            )}
-          </button>
-        )}
+        {/* Action buttons: Guardar Playlist & Pedir Canción */}
+        <div className="flex items-center gap-1.5">
+          {onOpenSavePlaylist && (
+            <button
+              onClick={() => onOpenSavePlaylist(currentTabSongs)}
+              disabled={currentTabSongs.length === 0}
+              title="Guardar estos temas como una playlist en tu perfil y compartirla"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+            >
+              <Bookmark className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden sm:inline">Guardar</span>
+              <span>Playlist</span>
+            </button>
+          )}
+
+          {activeTab === 'queue' && (
+            <button
+              onClick={onOpenAddModal}
+              disabled={isLocked}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all ${
+                isLocked
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white shadow-purple-600/25 cursor-pointer active:scale-95'
+              }`}
+            >
+              {isLocked ? (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-red-400" />
+                  <span>Cerrada</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Pedir Tema</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Rules notice when in Queue tab */}

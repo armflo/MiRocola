@@ -7,6 +7,8 @@ import { ClientToServerEvents, ServerToClientEvents } from '@mirocola/shared';
 import { connectDB, prisma } from './config/db.js';
 import { setupSocketHandlers } from './services/socketHandler.js';
 import { RoomManager } from './services/roomManager.js';
+import { authRouter } from './routes/authRoutes.js';
+import { playlistRouter } from './routes/playlistRoutes.js';
 
 dotenv.config();
 
@@ -32,6 +34,11 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
     methods: ['GET', 'POST']
   }
 });
+
+// Auth & Profile Routes
+app.use('/api/auth', authRouter);
+app.use('/api', authRouter);
+app.use('/api/playlists', playlistRouter);
 
 // REST Routes
 app.get('/api/health', (_req: Request, res: Response) => {

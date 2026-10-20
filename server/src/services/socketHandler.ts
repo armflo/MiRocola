@@ -25,7 +25,8 @@ export function setupSocketHandlers(io: TypedServer) {
           payload.avatar || '',
           payload.mode || 'COLLABORATIVE',
           socket.id,
-          payload.settings
+          payload.settings,
+          payload.authUser
         );
 
         socket.join(room.code);
@@ -52,7 +53,8 @@ export function setupSocketHandlers(io: TypedServer) {
           payload.code,
           payload.userName,
           payload.avatar || '',
-          socket.id
+          socket.id,
+          payload.authUser
         );
 
         socket.join(room.code);

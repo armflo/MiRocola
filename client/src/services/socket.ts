@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import type { ClientToServerEvents, ServerToClientEvents } from '@mirocola/shared';
 
 // Determine backend URL (dynamically or fallback to port 3001)
-const BACKEND_URL =
+export const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
   (window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin);
 

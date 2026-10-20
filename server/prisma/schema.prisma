@@ -7,30 +7,107 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
+  username     String         @unique
+  passwordHash String
+  avatar       String         @db.VarChar(500)
+  bio          String?        @db.VarChar(500)
+  djScore      Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  playlists    Playlist[]
+  comments     Comment[]
+  roomsHosted  Room[]         @relation("HostUser")
+  likes        PlaylistLike[]
+}
+
 model Room {
-  id        Int           @id @default(autoincrement())
-  code      String        @unique
-  name      String
-  mode      String        @default("COLLABORATIVE") // COLLABORATIVE or DJ_ONLY
-  hostName  String
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  history   SongHistory[]
+  id         Int           @id @default(autoincrement())
+  code       String        @unique
+  name       String
+  mode       String        @default("COLLABORATIVE") // COLLABORATIVE or DJ_ONLY
+  hostName   String
+  hostUserId Int?
+  hostUser   User?         @relation("HostUser", fields: [hostUserId], references: [id], onDelete: SetNull)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  history    SongHistory[]
 
   @@index([code])
 }
 
 model SongHistory {
+  id            Int      @id @default(autoincrement())
+  roomId        Int
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  youtubeId     String
+  title         String   @db.VarChar(500)
+  channelTitle  String   @db.VarChar(255)
+  duration      Int
+  thumbnail     String   @db.VarChar(500)
+  addedBy       String
+  addedByUserId Int?
+  playedAt      DateTime @default(now())
+
+  @@index([roomId])
+}
+
+model Playlist {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String         @db.VarChar(255)
+  description String?        @db.VarChar(1000)
+  slug        String         @unique
+  isPublic    Boolean        @default(true)
+  likesCount  Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  songs       PlaylistSong[]
+  comments    Comment[]
+  likes       PlaylistLike[]
+
+  @@index([userId])
+}
+
+model PlaylistSong {
   id           Int      @id @default(autoincrement())
-  roomId       Int
-  room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  playlistId   Int
+  playlist     Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   youtubeId    String
   title        String   @db.VarChar(500)
   channelTitle String   @db.VarChar(255)
   duration     Int
   thumbnail    String   @db.VarChar(500)
-  addedBy      String
-  playedAt     DateTime @default(now())
+  orderIndex   Int      @default(0)
+  addedAt      DateTime @default(now())
 
-  @@index([roomId])
+  @@index([playlistId])
+}
+
+model Comment {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlistId Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  content    String   @db.VarChar(1000)
+  createdAt  DateTime @default(now())
+
+  @@index([playlistId])
+}
+
+model PlaylistLike {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlistId Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, playlistId])
 }
