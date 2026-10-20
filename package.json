@@ -14,7 +14,7 @@
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build --workspace=shared && npm run build --workspace=server && npm run build --workspace=client",
     "build:client": "npm run build --workspace=shared && npm run build --workspace=client",
-    "build:server": "npm install && npm run build --workspace=shared && npm run prisma:generate --workspace=server && npm run build --workspace=server",
+    "build:server": "npm install && npm run build --workspace=shared && npm run prisma:generate --workspace=server && (npm run prisma:push --workspace=server || echo 'DB push skipped') && npm run build --workspace=server",
     "start:server": "npm run start --workspace=server"
   },
   "dependencies": {
