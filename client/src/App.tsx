@@ -491,7 +491,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Room Layout */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-24 lg:pb-12 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Left / Primary Column: Player, Soundboard & Stage (7 cols on desktop) */}
         <div
           className={`lg:col-span-7 flex flex-col gap-5 sm:gap-6 ${

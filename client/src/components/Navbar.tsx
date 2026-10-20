@@ -51,7 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className="sticky top-0 z-40 w-full border-b backdrop-blur-md px-3 sm:px-6 py-2 sm:py-2.5 transition-colors duration-500"
+      className="sticky top-0 z-40 w-full border-b backdrop-blur-md px-3 sm:px-6 py-2.5 sm:py-3 transition-colors duration-500 shadow-lg shadow-black/25"
       style={{
         backgroundColor: theme ? `${theme.bgDark}ee` : 'rgba(2, 6, 23, 0.9)',
         borderColor: theme ? theme.borderAccent : 'rgba(88, 28, 135, 0.4)'
