@@ -437,7 +437,7 @@ export const App: React.FC = () => {
   const isHost = currentUser?.isHost ?? false;
   const canControl = room.mode === 'COLLABORATIVE' || isHost;
   const currentSong = room.playback.currentSong;
-  const currentTheme = THEMES[room.settings?.theme || 'neon'];
+  const currentTheme = THEMES[room.settings?.theme || 'neon'] || THEMES.neon;
 
   // Current active sound effect metadata for alert
   const activeSoundMeta = lastSoundEvent
@@ -446,14 +446,25 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen text-slate-100 flex flex-col transition-colors duration-500 pb-20 lg:pb-0 relative"
+      className="min-h-screen text-slate-100 flex flex-col transition-colors duration-700 pb-20 lg:pb-0 relative overflow-hidden"
       style={{ backgroundColor: currentTheme.bgDark }}
     >
+      {/* Dynamic Ambient Theme Lighting Orbs */}
+      <div
+        className="fixed -top-40 -left-40 w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none transition-all duration-700 z-0"
+        style={{ backgroundColor: currentTheme.glow1 }}
+      />
+      <div
+        className="fixed -bottom-40 -right-40 w-[650px] h-[650px] rounded-full blur-[150px] pointer-events-none transition-all duration-700 z-0"
+        style={{ backgroundColor: currentTheme.glow2 }}
+      />
+
       {/* Top Navigation */}
       <Navbar
         room={room}
         currentUser={currentUser}
         authUser={authUser}
+        theme={currentTheme}
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenQR={() => setIsQRModalOpen(true)}
@@ -480,7 +491,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Room Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Left / Primary Column: Player, Soundboard & Stage (7 cols on desktop) */}
         <div
           className={`lg:col-span-7 flex flex-col gap-5 sm:gap-6 ${

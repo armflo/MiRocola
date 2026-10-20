@@ -10,7 +10,9 @@ export interface ThemeConfig {
   badgeBg: string;
   badgeText: string;
   borderAccent: string;
-  glowColor: string;
+  accentColor: string;
+  glow1: string;
+  glow2: string;
   bgDark: string;
   cardBg: string;
   accentText: string;
@@ -26,10 +28,12 @@ export const THEMES: Record<RoomTheme, ThemeConfig> = {
     btnGradient: 'from-purple-600 via-pink-600 to-indigo-600',
     badgeBg: 'bg-purple-950/80',
     badgeText: 'text-pink-300',
-    borderAccent: 'border-purple-800/50',
-    glowColor: 'rgba(236, 72, 153, 0.4)',
-    bgDark: 'bg-slate-950',
-    cardBg: 'bg-slate-900/80',
+    borderAccent: 'rgba(168, 85, 247, 0.4)',
+    accentColor: '#ec4899',
+    glow1: 'rgba(168, 85, 247, 0.35)',
+    glow2: 'rgba(236, 72, 153, 0.25)',
+    bgDark: '#030712',
+    cardBg: 'rgba(15, 23, 42, 0.85)',
     accentText: 'text-pink-400'
   },
   retro: {
@@ -41,10 +45,12 @@ export const THEMES: Record<RoomTheme, ThemeConfig> = {
     btnGradient: 'from-amber-600 via-yellow-600 to-orange-600',
     badgeBg: 'bg-amber-950/80',
     badgeText: 'text-amber-300',
-    borderAccent: 'border-amber-800/50',
-    glowColor: 'rgba(245, 158, 11, 0.4)',
-    bgDark: 'bg-[#0f0c08]',
-    cardBg: 'bg-[#1a140d]/80',
+    borderAccent: 'rgba(245, 158, 11, 0.4)',
+    accentColor: '#f59e0b',
+    glow1: 'rgba(245, 158, 11, 0.4)',
+    glow2: 'rgba(234, 88, 12, 0.3)',
+    bgDark: '#0f0a04',
+    cardBg: 'rgba(26, 18, 9, 0.85)',
     accentText: 'text-amber-400'
   },
   emerald: {
@@ -56,10 +62,12 @@ export const THEMES: Record<RoomTheme, ThemeConfig> = {
     btnGradient: 'from-emerald-600 via-teal-600 to-cyan-600',
     badgeBg: 'bg-emerald-950/80',
     badgeText: 'text-emerald-300',
-    borderAccent: 'border-emerald-800/50',
-    glowColor: 'rgba(16, 185, 129, 0.4)',
-    bgDark: 'bg-[#06120e]',
-    cardBg: 'bg-[#091a14]/80',
+    borderAccent: 'rgba(16, 185, 129, 0.4)',
+    accentColor: '#10b981',
+    glow1: 'rgba(16, 185, 129, 0.45)',
+    glow2: 'rgba(20, 184, 166, 0.35)',
+    bgDark: '#02140d',
+    cardBg: 'rgba(6, 28, 20, 0.85)',
     accentText: 'text-emerald-400'
   },
   midnight: {
@@ -71,10 +79,12 @@ export const THEMES: Record<RoomTheme, ThemeConfig> = {
     btnGradient: 'from-blue-600 via-indigo-600 to-cyan-600',
     badgeBg: 'bg-blue-950/80',
     badgeText: 'text-cyan-300',
-    borderAccent: 'border-blue-800/50',
-    glowColor: 'rgba(6, 182, 212, 0.4)',
-    bgDark: 'bg-[#060a14]',
-    cardBg: 'bg-[#0a1122]/80',
+    borderAccent: 'rgba(6, 182, 212, 0.4)',
+    accentColor: '#06b6d4',
+    glow1: 'rgba(6, 182, 212, 0.4)',
+    glow2: 'rgba(59, 130, 246, 0.3)',
+    bgDark: '#030816',
+    cardBg: 'rgba(8, 18, 38, 0.85)',
     accentText: 'text-cyan-400'
   },
   sunset: {
@@ -86,10 +96,12 @@ export const THEMES: Record<RoomTheme, ThemeConfig> = {
     btnGradient: 'from-orange-600 via-rose-600 to-red-600',
     badgeBg: 'bg-rose-950/80',
     badgeText: 'text-rose-300',
-    borderAccent: 'border-rose-800/50',
-    glowColor: 'rgba(244, 63, 94, 0.4)',
-    bgDark: 'bg-[#13070a]',
-    cardBg: 'bg-[#1e0d12]/80',
+    borderAccent: 'rgba(244, 63, 94, 0.4)',
+    accentColor: '#f43f5e',
+    glow1: 'rgba(244, 63, 94, 0.45)',
+    glow2: 'rgba(249, 115, 22, 0.35)',
+    bgDark: '#140409',
+    cardBg: 'rgba(32, 10, 16, 0.85)',
     accentText: 'text-rose-400'
   }
 };

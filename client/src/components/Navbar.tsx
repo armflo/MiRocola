@@ -12,11 +12,13 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { RoomState, User, AuthUser } from '@mirocola/shared';
+import type { ThemeConfig } from '../lib/theme';
 
 interface NavbarProps {
   room: RoomState;
   currentUser: User | null;
   authUser?: AuthUser | null;
+  theme?: ThemeConfig;
   onOpenUsers: () => void;
   onOpenSettings?: () => void;
   onOpenQR?: () => void;
@@ -29,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   room,
   currentUser,
   authUser,
+  theme,
   onOpenUsers,
   onOpenSettings,
   onOpenQR,
@@ -47,7 +50,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isHost = currentUser?.isHost ?? false;
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-purple-900/40 bg-slate-950/90 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-2.5">
+    <header
+      className="sticky top-0 z-40 w-full border-b backdrop-blur-md px-3 sm:px-6 py-2 sm:py-2.5 transition-colors duration-500"
+      style={{
+        backgroundColor: theme ? `${theme.bgDark}ee` : 'rgba(2, 6, 23, 0.9)',
+        borderColor: theme ? theme.borderAccent : 'rgba(88, 28, 135, 0.4)'
+      }}
+    >
       <div className="max-w-7xl mx-auto">
         {/* DESKTOP LAYOUT (sm:flex) */}
         <div className="hidden sm:flex items-center justify-between gap-4">

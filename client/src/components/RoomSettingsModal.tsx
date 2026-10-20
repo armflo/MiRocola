@@ -140,9 +140,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({
                   <button
                     key={th.id}
                     type="button"
-                    onClick={() =>
-                      setSettings((prev) => ({ ...prev, theme: th.id as RoomTheme }))
-                    }
+                    onClick={() => {
+                      setSettings((prev) => ({ ...prev, theme: th.id as RoomTheme }));
+                      // Instant live application of theme
+                      onUpdateSettings({ theme: th.id as RoomTheme });
+                    }}
                     className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
                       isSelected
                         ? 'bg-purple-950/90 border-pink-500 shadow-md shadow-pink-500/20'
