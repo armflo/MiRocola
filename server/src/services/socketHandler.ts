@@ -4,7 +4,8 @@ import {
   ServerToClientEvents,
   ChatMessage,
   ReactionEvent,
-  SoundboardEvent
+  SoundboardEvent,
+  VoiceUser
 } from '@mirocola/shared';
 import { RoomManager } from './roomManager.js';
 import { YouTubeService } from './youtubeService.js';
@@ -14,6 +15,7 @@ type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
 export function setupSocketHandlers(io: TypedServer) {
   const roomManager = RoomManager.getInstance();
+  const voiceRooms = new Map<string, Map<string, VoiceUser>>();
 
   // Background playback auto-advance & Auto-DJ broadcaster
   roomManager.setPlaybackSyncCallback((roomCode, room, autoDjSong) => {
@@ -415,6 +417,7 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
+    // 7. Room Mode
     socket.on('room:setMode', (mode) => {
       try {
         const { roomCode, userId } = getSession();
@@ -425,8 +428,91 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
-    // 7. Disconnection
+    // 8. Voice Chat (WebRTC P2P Signaling for Karaoke Party)
+    socket.on('voice:join', (payload) => {
+      try {
+        const { roomCode, user } = payload;
+        if (!voiceRooms.has(roomCode)) {
+          voiceRooms.set(roomCode, new Map());
+        }
+        const roomMap = voiceRooms.get(roomCode)!;
+
+        const voiceUser: VoiceUser = {
+          userId: user.id,
+          socketId: socket.id,
+          userName: user.name,
+          avatar: user.avatar,
+          isMuted: false
+        };
+
+        // Send existing voice participants to newcomer
+        const existingUsers = Array.from(roomMap.values());
+        socket.emit('voice:users', existingUsers);
+
+        // Register newcomer in voice map
+        roomMap.set(socket.id, voiceUser);
+
+        // Notify other room participants in voice
+        socket.to(roomCode).emit('voice:userJoined', voiceUser);
+
+        roomManager.recordActivity(roomCode);
+      } catch (err: any) {
+        socket.emit('room:error', err.message);
+      }
+    });
+
+    socket.on('voice:signal', (payload) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        const fromUserId = session ? session.userId : socket.id;
+        io.to(payload.targetSocketId).emit('voice:signal', {
+          fromSocketId: socket.id,
+          fromUserId,
+          signal: payload.signal
+        });
+      } catch {
+        // Silent catch on peer signaling
+      }
+    });
+
+    socket.on('voice:mute', (isMuted) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        const roomMap = voiceRooms.get(session.roomCode);
+        if (roomMap && roomMap.has(socket.id)) {
+          roomMap.get(socket.id)!.isMuted = isMuted;
+          io.to(session.roomCode).emit('voice:muteChanged', { socketId: socket.id, isMuted });
+        }
+      } catch {
+        // Silent catch
+      }
+    });
+
+    socket.on('voice:leave', () => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        const roomMap = voiceRooms.get(session.roomCode);
+        if (roomMap && roomMap.has(socket.id)) {
+          roomMap.delete(socket.id);
+          io.to(session.roomCode).emit('voice:userLeft', socket.id);
+        }
+      } catch {
+        // Silent catch
+      }
+    });
+
+    // 9. Disconnection
     socket.on('disconnect', () => {
+      // Clean up voice connection if user was in voice
+      for (const [code, roomMap] of voiceRooms.entries()) {
+        if (roomMap.has(socket.id)) {
+          roomMap.delete(socket.id);
+          io.to(code).emit('voice:userLeft', socket.id);
+        }
+      }
+
       const { room, disconnectedUser, newHost } = roomManager.handleDisconnect(socket.id);
       if (room && disconnectedUser) {
         io.to(room.code).emit('users:update', room.users);

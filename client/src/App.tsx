@@ -42,7 +42,7 @@ import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { SavePlaylistModal } from './components/SavePlaylistModal';
 import { PlaylistViewModal } from './components/PlaylistViewModal';
-import { PartyTvMode } from './components/PartyTvMode';
+import { VoiceChatBar } from './components/VoiceChatBar';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -631,15 +631,20 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Voice Chat / Karaoke Party Bar */}
+      <div className="relative z-10 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4">
+        <VoiceChatBar roomCode={room.code} currentUser={currentUser} />
+      </div>
+
       {/* Main Room Layout */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-24 lg:pb-12 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-24 lg:pb-12 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Left / Primary Column: Player, Soundboard & Stage (7 cols on desktop) */}
         <div
           className={`lg:col-span-7 flex flex-col gap-5 sm:gap-6 ${
             mobileTab === 'player' ? 'block' : 'hidden lg:flex'
           }`}
         >
-          {/* Synchronized Player */}
+          {/* Synchronized Player with Native TV Theater Mode */}
           <YouTubeSyncPlayer
             playback={room.playback}
             currentUser={currentUser}
@@ -654,6 +659,19 @@ export const App: React.FC = () => {
             onNext={handleNext}
             onVoteSkip={handleVoteSkip}
             onOpenAddModal={() => setIsAddModalOpen(true)}
+            isTvMode={isTvModeOpen}
+            onCloseTvMode={() => setIsTvModeOpen(false)}
+            roomCode={room.code}
+            roomName={room.name}
+            usersCount={room.users.length}
+            queue={room.queue}
+            reactions={reactions}
+            lastSoundEvent={lastSoundEvent}
+            inactivityWarning={inactivityWarning}
+            onKeepAlive={() => {
+              socket.emit('room:keepAlive');
+              setInactivityWarning(null);
+            }}
           />
 
           {/* Soundboard DJ Effects */}
@@ -897,24 +915,6 @@ export const App: React.FC = () => {
         authUser={authUser}
         onRequireAuth={() => setIsAuthModalOpen(true)}
         onLoadSongsToQueue={handleLoadSongsToQueue}
-      />
-
-      {/* TV / Projector Party Mode */}
-      <PartyTvMode
-        isOpen={isTvModeOpen}
-        onClose={() => setIsTvModeOpen(false)}
-        room={room}
-        currentUser={currentUser}
-        reactions={reactions}
-        lastSoundEvent={lastSoundEvent}
-        inactivityWarning={inactivityWarning}
-        onKeepAlive={() => {
-          socket.emit('room:keepAlive');
-          setInactivityWarning(null);
-        }}
-        onPlay={() => handlePlay()}
-        onPause={() => handlePause()}
-        onNext={handleNext}
       />
     </div>
   );

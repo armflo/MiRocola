@@ -193,6 +193,15 @@ export interface YouTubeSearchResult {
   thumbnail: string;
 }
 
+export interface VoiceUser {
+  userId: string;
+  socketId: string;
+  userName: string;
+  avatar: string;
+  isMuted: boolean;
+  isSpeaking?: boolean;
+}
+
 // Socket Events Definition
 export interface ServerToClientEvents {
   'room:sync': (state: RoomState) => void;
@@ -210,6 +219,12 @@ export interface ServerToClientEvents {
   'inactivity:warning': (data: { remainingSeconds: number; message: string }) => void;
   'inactivity:cleared': () => void;
   'room:closed': (data: { reason: string; message: string }) => void;
+  // Voice chat WebRTC events
+  'voice:users': (users: VoiceUser[]) => void;
+  'voice:userJoined': (user: VoiceUser) => void;
+  'voice:userLeft': (socketId: string) => void;
+  'voice:signal': (data: { fromSocketId: string; fromUserId: string; signal: any }) => void;
+  'voice:muteChanged': (data: { socketId: string; isMuted: boolean }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -222,6 +237,11 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; state?: RoomState; error?: string }) => void
   ) => void;
   'room:keepAlive': (callback?: () => void) => void;
+  // Voice chat WebRTC client actions
+  'voice:join': (payload: { roomCode: string; user: { id: string; name: string; avatar: string } }) => void;
+  'voice:leave': () => void;
+  'voice:signal': (payload: { targetSocketId: string; signal: any }) => void;
+  'voice:mute': (isMuted: boolean) => void;
   'room:create': (
     payload: {
       roomName: string;

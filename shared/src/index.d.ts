@@ -160,6 +160,14 @@ export interface YouTubeSearchResult {
     durationFormatted: string;
     thumbnail: string;
 }
+export interface VoiceUser {
+    userId: string;
+    socketId: string;
+    userName: string;
+    avatar: string;
+    isMuted: boolean;
+    isSpeaking?: boolean;
+}
 export interface ServerToClientEvents {
     'room:sync': (state: RoomState) => void;
     'room:error': (message: string) => void;
@@ -181,6 +189,18 @@ export interface ServerToClientEvents {
     'room:closed': (data: {
         reason: string;
         message: string;
+    }) => void;
+    'voice:users': (users: VoiceUser[]) => void;
+    'voice:userJoined': (user: VoiceUser) => void;
+    'voice:userLeft': (socketId: string) => void;
+    'voice:signal': (data: {
+        fromSocketId: string;
+        fromUserId: string;
+        signal: any;
+    }) => void;
+    'voice:muteChanged': (data: {
+        socketId: string;
+        isMuted: boolean;
     }) => void;
 }
 export interface ClientToServerEvents {
@@ -205,6 +225,20 @@ export interface ClientToServerEvents {
         error?: string;
     }) => void) => void;
     'room:keepAlive': (callback?: () => void) => void;
+    'voice:join': (payload: {
+        roomCode: string;
+        user: {
+            id: string;
+            name: string;
+            avatar: string;
+        };
+    }) => void;
+    'voice:leave': () => void;
+    'voice:signal': (payload: {
+        targetSocketId: string;
+        signal: any;
+    }) => void;
+    'voice:mute': (isMuted: boolean) => void;
     'room:create': (payload: {
         roomName: string;
         userName: string;
