@@ -32,10 +32,12 @@ authRouter.all('/db/init', async (_req: Request, res: Response) => {
     const result = await ensureTablesExist();
     return res.json({
       success: result.success,
-      message: result.success
-        ? 'Todas las tablas de la base de datos fueron creadas o verificadas exitosamente.'
-        : 'Algunas tablas tuvieron advertencias al crearse.',
-      errors: result.errors
+      userTableOk: result.userTableOk,
+      message: result.userTableOk
+        ? '¡La tabla User y todas las tablas fueron verificadas exitosamente!'
+        : 'Hubo advertencias al inicializar tablas.',
+      errors: result.errors,
+      cliLog: result.cliLog
     });
   } catch (err: any) {
     return res.status(500).json({

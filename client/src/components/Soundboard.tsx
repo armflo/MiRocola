@@ -58,22 +58,23 @@ export const Soundboard: React.FC<SoundboardProps> = ({
         )}
       </div>
 
-      {/* Sound Buttons Grid */}
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+      {/* Sound Buttons Grid: 10 effects compact layout */}
+      <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 sm:gap-1.5">
         {SOUND_EFFECTS.map((sound) => {
           const isActive = activeSound === sound.id;
           return (
             <button
               key={sound.id}
               onClick={() => handleClick(sound.id)}
-              className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer select-none active:scale-95 ${
+              title={`Efecto DJ: ${sound.name}`}
+              className={`flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer select-none active:scale-95 ${
                 isActive
-                  ? 'bg-gradient-to-tr ' + sound.color + ' border-white text-white scale-105 shadow-lg'
-                  : 'bg-slate-950/70 border-purple-900/30 hover:border-purple-700/60 text-slate-200 hover:bg-slate-950'
+                  ? 'bg-gradient-to-tr ' + sound.color + ' border-white text-white scale-105 shadow-lg z-10'
+                  : 'bg-slate-950/70 border-purple-900/30 hover:border-purple-600/60 text-slate-200 hover:bg-slate-900/80 hover:text-white'
               }`}
             >
-              <span className="text-xl sm:text-2xl mb-0.5">{sound.emoji}</span>
-              <span className="text-[10px] font-bold tracking-tight truncate max-w-full">
+              <span className="text-base sm:text-lg leading-tight mb-0.5">{sound.emoji}</span>
+              <span className="text-[9px] sm:text-[10px] font-bold tracking-tight truncate max-w-full">
                 {sound.label}
               </span>
             </button>

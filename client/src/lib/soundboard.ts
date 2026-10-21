@@ -30,6 +30,13 @@ export const SOUND_EFFECTS: SoundMeta[] = [
     color: 'from-amber-500 to-red-500'
   },
   {
+    id: 'drop',
+    name: 'Bass Drop',
+    emoji: '💥',
+    label: 'Drop Boom',
+    color: 'from-rose-600 to-purple-800'
+  },
+  {
     id: 'applause',
     name: 'Aplausos',
     emoji: '👏',
@@ -47,14 +54,42 @@ export const SOUND_EFFECTS: SoundMeta[] = [
     id: 'siren',
     name: 'Sirena',
     emoji: '🚨',
-    label: 'Fiesta',
+    label: 'Sirena',
     color: 'from-red-500 to-rose-600'
+  },
+  {
+    id: 'laser',
+    name: 'Láser EDM',
+    emoji: '🚀',
+    label: 'Láser',
+    color: 'from-cyan-400 to-blue-600'
+  },
+  {
+    id: 'bell',
+    name: 'Campana Ring',
+    emoji: '🔔',
+    label: 'Campana',
+    color: 'from-yellow-400 to-amber-600'
+  },
+  {
+    id: 'rewind',
+    name: 'Rewind DJ',
+    emoji: '⏪',
+    label: 'Rewind',
+    color: 'from-fuchsia-500 to-indigo-600'
+  },
+  {
+    id: 'cheer',
+    name: 'Silbato Fiesta',
+    emoji: '🎉',
+    label: 'Fiesta',
+    color: 'from-green-400 to-emerald-600'
   },
   {
     id: 'badumtss',
     name: 'Ba-Dum-Tss',
     emoji: '🥁',
-    label: 'Chiste',
+    label: 'Remate',
     color: 'from-blue-500 to-indigo-600'
   }
 ];
@@ -71,6 +106,9 @@ export function playSoundEffect(soundId: SoundEffectId) {
       case 'airhorn':
         playAirhorn(ctx, now);
         break;
+      case 'drop':
+        playBassDrop(ctx, now);
+        break;
       case 'applause':
         playApplause(ctx, now);
         break;
@@ -79,6 +117,18 @@ export function playSoundEffect(soundId: SoundEffectId) {
         break;
       case 'siren':
         playSiren(ctx, now);
+        break;
+      case 'laser':
+        playLaser(ctx, now);
+        break;
+      case 'bell':
+        playBell(ctx, now);
+        break;
+      case 'rewind':
+        playRewind(ctx, now);
+        break;
+      case 'cheer':
+        playCheer(ctx, now);
         break;
       case 'badumtss':
         playBadumtss(ctx, now);
@@ -259,4 +309,114 @@ function playCymbal(ctx: AudioContext, time: number) {
 
   noise.start(time);
   noise.stop(time + 0.6);
+}
+
+// 6. Bass Drop 808 Boom
+function playBassDrop(ctx: AudioContext, start: number) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, start);
+  osc.frequency.exponentialRampToValueAtTime(32, start + 0.8);
+
+  gain.gain.setValueAtTime(0.8, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + 0.9);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(start);
+  osc.stop(start + 0.9);
+}
+
+// 7. EDM Laser Pew-Pew
+function playLaser(ctx: AudioContext, start: number) {
+  const shots = [0, 0.12, 0.24];
+  shots.forEach((offset) => {
+    const t = start + offset;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1800, t);
+    osc.frequency.exponentialRampToValueAtTime(150, t + 0.1);
+
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.1);
+  });
+}
+
+// 8. Boxing Ring Bell (Ding-Ding-Ding)
+function playBell(ctx: AudioContext, start: number) {
+  const rings = [0, 0.2, 0.4];
+  rings.forEach((offset) => {
+    const t = start + offset;
+    [1046.5, 2093].forEach((freq) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + 0.35);
+    });
+  });
+}
+
+// 9. DJ Vinyl Rewind / Tape Stop
+function playRewind(ctx: AudioContext, start: number) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, start);
+  osc.frequency.exponentialRampToValueAtTime(1600, start + 0.35);
+
+  gain.gain.setValueAtTime(0.35, start);
+  gain.gain.linearRampToValueAtTime(0.4, start + 0.25);
+  gain.gain.exponentialRampToValueAtTime(0.01, start + 0.4);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(start);
+  osc.stop(start + 0.4);
+}
+
+// 10. Fiesta Whistle / Celebration Cheer
+function playCheer(ctx: AudioContext, start: number) {
+  const bursts = [0, 0.15, 0.3];
+  bursts.forEach((offset, idx) => {
+    const t = start + offset;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    const baseFreq = idx === 1 ? 1600 : 1300;
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.linearRampToValueAtTime(baseFreq + 300, t + 0.08);
+
+    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.12);
+  });
 }

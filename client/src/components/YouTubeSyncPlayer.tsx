@@ -188,11 +188,14 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     setFallbackStatus(null);
   }, [currentSong?.youtubeId]);
 
-  // Countdown timer for automatic skipping of unplayable videos
+  // Countdown timer for automatic resolution or skipping of unplayable videos
   useEffect(() => {
     if (!playbackError) return;
     if (playbackError.countdown <= 0) {
-      if (canControl) {
+      if ((playbackError.code === 101 || playbackError.code === 150) && currentSong) {
+        // Auto-switch to backup audio track of the SAME song!
+        handleFindAlternative(currentSong);
+      } else if (canControl) {
         onNext();
       }
       return;
@@ -205,7 +208,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [playbackError, canControl, onNext]);
+  }, [playbackError, canControl, onNext, currentSong]);
 
   // Initialize YouTube Iframe API
   useEffect(() => {
@@ -255,11 +258,13 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
             console.warn('[YouTube Player] Playback error code:', code);
             let title = 'Video no disponible';
             let message = 'Este video no se puede reproducir en el reproductor integrado.';
+            let countdownSeconds = 5;
 
             if (code === 101 || code === 150) {
-              title = 'Incrustación Bloqueada por Copyright';
+              title = 'Protección de Copyright en Videoclip';
               message =
-                'La discográfica ha bloqueado la reproducción de este videoclip oficial fuera de YouTube. Buscando automáticamente una versión alternativa de audio/karaoke compatible...';
+                'La discográfica restringe ver este videoclip oficial fuera de YouTube. Cambiando automáticamente a la pista de audio de respaldo de esta misma canción...';
+              countdownSeconds = 4;
               if (currentSong) {
                 handleFindAlternative(currentSong);
               }
@@ -275,7 +280,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
               code,
               title,
               message,
-              countdown: 6
+              countdown: countdownSeconds
             });
           }
         }
@@ -909,33 +914,50 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
             )}
 
             {/* Action buttons */}
-            <div className="flex items-center gap-3 flex-wrap justify-center">
+            <div className="flex items-center gap-2.5 flex-wrap justify-center">
               {(playbackError.code === 101 || playbackError.code === 150) && (
-                <button
-                  onClick={() => handleFindAlternative(currentSong)}
-                  disabled={isSearchingFallback}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-xs text-white shadow-lg shadow-pink-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
-                  title="Buscar y reproducir automáticamente una versión oficial de audio o karaoke"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSearchingFallback ? 'animate-spin' : ''}`} />
-                  <span>{isSearchingFallback ? 'Buscando audio...' : 'Reemplazar con Audio Oficial'}</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => handleFindAlternative(currentSong)}
+                    disabled={isSearchingFallback}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-xs text-white shadow-lg shadow-pink-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+                    title="Cargar inmediatamente la pista de audio oficial sin restricciones de la misma canción"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingFallback ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isSearchingFallback
+                        ? 'Cargando audio de respaldo...'
+                        : `Cargar Audio de Respaldo ${playbackError.countdown > 0 ? `(${playbackError.countdown}s)` : ''}`}
+                    </span>
+                  </button>
+
+                  <a
+                    href={`https://open.spotify.com/search/${encodeURIComponent(currentSong.title)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-xs font-semibold text-emerald-300 hover:text-white flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Buscar y escuchar esta canción en Spotify"
+                  >
+                    <span>🟢 Abrir en Spotify</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                  </a>
+                </>
               )}
 
               {canControl ? (
                 <button
                   onClick={onNext}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 hover:opacity-90 font-bold text-xs text-white shadow-lg shadow-red-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 font-bold text-xs text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                 >
-                  <SkipForward className="w-4 h-4" />
+                  <SkipForward className="w-4 h-4 text-slate-400" />
                   <span>
-                    Saltar ahora {playbackError.countdown > 0 && `(${playbackError.countdown}s)`}
+                    Saltar tema {playbackError.code !== 101 && playbackError.code !== 150 && playbackError.countdown > 0 ? `(${playbackError.countdown}s)` : ''}
                   </span>
                 </button>
               ) : (
                 <button
                   onClick={onVoteSkip}
-                  className="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 font-bold text-xs text-white shadow-md flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 font-bold text-xs text-white shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
                   <Flame className="w-4 h-4" />
                   <span>Votar para saltar ({skipVotes.length}/{requiredSkipVotes})</span>
@@ -946,10 +968,10 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
                 href={currentSong.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors"
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors"
               >
-                <span>Mirar en YouTube</span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                <span>Ver en YouTube</span>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
               </a>
             </div>
           </div>

@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import { exec } from 'child_process';
+import util from 'util';
+
+const execAsync = util.promisify(exec);
 
 dotenv.config();
 
@@ -44,12 +48,47 @@ export const prisma = new PrismaClient(
 );
 
 /**
+ * Executes Prisma CLI db push in background with SSL env
+ */
+async function runPrismaDbPush(): Promise<{ success: boolean; log: string }> {
+  try {
+    console.log('🔄 Attempting npx prisma db push with secure SSL URL...');
+    const { stdout, stderr } = await execAsync(
+      'npx prisma db push --skip-generate --accept-data-loss',
+      {
+        env: {
+          ...process.env,
+          DATABASE_URL: formattedDbUrl || process.env.DATABASE_URL
+        },
+        timeout: 25000
+      }
+    );
+    const log = (stdout || '') + (stderr || '');
+    console.log('✅ prisma db push output:', log);
+    return { success: true, log };
+  } catch (err: any) {
+    const log = err?.message || String(err);
+    console.warn('Notice: npx prisma db push notice:', log);
+    return { success: false, log };
+  }
+}
+
+/**
  * Automatically creates all schema tables if they don't exist yet
  */
-export async function ensureTablesExist(): Promise<{ success: boolean; errors: string[] }> {
-  console.log('⚡ Initializing database schema tables if not present...');
+export async function ensureTablesExist(): Promise<{
+  success: boolean;
+  userTableOk: boolean;
+  errors: string[];
+  cliLog?: string;
+}> {
+  console.log('⚡ Initializing database schema tables...');
   const errors: string[] = [];
 
+  // Step 1: Try Prisma CLI db push first
+  const cliRes = await runPrismaDbPush();
+
+  // Step 2: Native DDL without trailing semicolons (prepared statements fail with ;)
   const tableDefinitions = [
     `CREATE TABLE IF NOT EXISTS \`User\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -61,10 +100,10 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`djScore\` INT NOT NULL DEFAULT 0,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      UNIQUE INDEX \`User_email_key\` (\`email\`),
-      UNIQUE INDEX \`User_username_key\` (\`username\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`User_email_key\` (\`email\`),
+      UNIQUE KEY \`User_username_key\` (\`username\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`Room\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -75,10 +114,10 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`hostUserId\` INT NULL,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      UNIQUE INDEX \`Room_code_key\` (\`code\`),
-      INDEX \`Room_code_idx\` (\`code\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`Room_code_key\` (\`code\`),
+      KEY \`Room_code_idx\` (\`code\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`SongHistory\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -91,9 +130,9 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`addedBy\` VARCHAR(191) NOT NULL,
       \`addedByUserId\` INT NULL,
       \`playedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      INDEX \`SongHistory_roomId_idx\` (\`roomId\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      KEY \`SongHistory_roomId_idx\` (\`roomId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`Playlist\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -105,10 +144,10 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`likesCount\` INT NOT NULL DEFAULT 0,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      UNIQUE INDEX \`Playlist_slug_key\` (\`slug\`),
-      INDEX \`Playlist_userId_idx\` (\`userId\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`Playlist_slug_key\` (\`slug\`),
+      KEY \`Playlist_userId_idx\` (\`userId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`PlaylistSong\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -120,9 +159,9 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`thumbnail\` VARCHAR(500) NOT NULL,
       \`orderIndex\` INT NOT NULL DEFAULT 0,
       \`addedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      INDEX \`PlaylistSong_playlistId_idx\` (\`playlistId\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      KEY \`PlaylistSong_playlistId_idx\` (\`playlistId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`Comment\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
@@ -130,18 +169,18 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
       \`playlistId\` INT NOT NULL,
       \`content\` VARCHAR(1000) NOT NULL,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      INDEX \`Comment_playlistId_idx\` (\`playlistId\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+      PRIMARY KEY (\`id\`),
+      KEY \`Comment_playlistId_idx\` (\`playlistId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 
     `CREATE TABLE IF NOT EXISTS \`PlaylistLike\` (
       \`id\` INT NOT NULL AUTO_INCREMENT,
       \`userId\` INT NOT NULL,
       \`playlistId\` INT NOT NULL,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      UNIQUE INDEX \`PlaylistLike_userId_playlistId_key\` (\`userId\`, \`playlistId\`),
-      PRIMARY KEY (\`id\`)
-    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`PlaylistLike_userId_playlistId_key\` (\`userId\`, \`playlistId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
   ];
 
   for (const sql of tableDefinitions) {
@@ -153,7 +192,23 @@ export async function ensureTablesExist(): Promise<{ success: boolean; errors: s
     }
   }
 
-  return { success: errors.length === 0, errors };
+  // Step 3: Verify User table exists
+  let userTableOk = false;
+  try {
+    await prisma.$queryRawUnsafe('SELECT 1 FROM `User` LIMIT 1');
+    userTableOk = true;
+    console.log('✅ User table confirmed to exist in current database!');
+  } catch (checkErr: any) {
+    console.error('⚠️ Verification query for User table failed:', checkErr?.message || checkErr);
+    errors.push('Verification check failed: ' + (checkErr?.message || String(checkErr)));
+  }
+
+  return {
+    success: errors.length === 0 || userTableOk,
+    userTableOk,
+    errors,
+    cliLog: cliRes.log
+  };
 }
 
 /**

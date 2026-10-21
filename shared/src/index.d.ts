@@ -141,7 +141,7 @@ export interface ReactionEvent {
     };
     timestamp: number;
 }
-export type SoundEffectId = 'airhorn' | 'applause' | 'scratch' | 'siren' | 'badumtss';
+export type SoundEffectId = 'airhorn' | 'applause' | 'scratch' | 'siren' | 'badumtss' | 'drop' | 'bell' | 'laser' | 'rewind' | 'cheer';
 export interface SoundboardEvent {
     id: string;
     soundId: SoundEffectId;
