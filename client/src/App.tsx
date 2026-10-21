@@ -21,7 +21,8 @@ import type {
   SoundEffectId,
   SoundboardEvent,
   YouTubeSearchResult,
-  AuthUser
+  AuthUser,
+  ActiveRoomGame
 } from '@mirocola/shared';
 import { formatTime } from './lib/utils';
 import { socket, wakeUpBackend } from './services/socket';
@@ -43,6 +44,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { SavePlaylistModal } from './components/SavePlaylistModal';
 import { PlaylistViewModal } from './components/PlaylistViewModal';
 import { VoiceChatBar } from './components/VoiceChatBar';
+import { MiniGamesHub } from './components/MiniGamesHub';
 
 export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -68,6 +70,8 @@ export const App: React.FC = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [isTvModeOpen, setIsTvModeOpen] = useState(false);
+  const [isMiniGamesOpen, setIsMiniGamesOpen] = useState(false);
+  const [activeGame, setActiveGame] = useState<ActiveRoomGame | null>(null);
 
   // Soundboard state
   const [isSoundboardMuted, setIsSoundboardMuted] = useState(false);
@@ -214,6 +218,23 @@ export const App: React.FC = () => {
       setLobbyError(data.message || 'La sala fue cerrada automáticamente por inactividad.');
     }
 
+    function onGameUpdate(game: ActiveRoomGame | null) {
+      setActiveGame(game);
+      if (game) {
+        setIsMiniGamesOpen(true);
+      }
+    }
+
+    function onGameNotification(data: { title: string; message: string; emoji: string }) {
+      if (data.emoji === '🏆' || data.emoji === '🎡') {
+        confetti({
+          particleCount: 30,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
     socket.on('room:sync', onRoomSync);
     socket.on('playback:sync', onPlaybackSync);
     socket.on('queue:update', onQueueUpdate);
@@ -229,6 +250,8 @@ export const App: React.FC = () => {
     socket.on('inactivity:warning', onInactivityWarning);
     socket.on('inactivity:cleared', onInactivityCleared);
     socket.on('room:closed', onRoomClosed);
+    socket.on('game:update', onGameUpdate);
+    socket.on('game:notification', onGameNotification);
 
     return () => {
       socket.off('room:sync', onRoomSync);
@@ -246,6 +269,8 @@ export const App: React.FC = () => {
       socket.off('inactivity:warning', onInactivityWarning);
       socket.off('inactivity:cleared', onInactivityCleared);
       socket.off('room:closed', onRoomClosed);
+      socket.off('game:update', onGameUpdate);
+      socket.off('game:notification', onGameNotification);
     };
   }, [isSoundboardMuted]);
 
@@ -575,10 +600,12 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         authUser={authUser}
         theme={currentTheme}
+        activeGame={activeGame}
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onOpenQR={() => setIsQRModalOpen(true)}
         onOpenTvMode={() => setIsTvModeOpen(true)}
+        onOpenMiniGames={() => setIsMiniGamesOpen(true)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onLeaveRoom={handleLeaveRoom}
@@ -915,6 +942,15 @@ export const App: React.FC = () => {
         authUser={authUser}
         onRequireAuth={() => setIsAuthModalOpen(true)}
         onLoadSongsToQueue={handleLoadSongsToQueue}
+      />
+
+      {/* 🎮 Party Mini-games Hub */}
+      <MiniGamesHub
+        isOpen={isMiniGamesOpen}
+        onClose={() => setIsMiniGamesOpen(false)}
+        activeGame={activeGame}
+        room={room}
+        currentUser={currentUser}
       />
     </div>
   );

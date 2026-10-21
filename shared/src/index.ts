@@ -212,6 +212,86 @@ export interface VoiceUser {
   isSpeaking?: boolean;
 }
 
+// ==========================================
+// 🎮 Minijuegos Multiplayer Types
+// ==========================================
+export type MiniGameType = 'quiz' | 'clash' | 'roulette';
+
+export interface QuizOption {
+  id: string;
+  title: string;
+  artist: string;
+}
+
+export interface QuizScoreItem {
+  userId: string;
+  userName: string;
+  avatar: string;
+  score: number;
+  streak: number;
+  lastAnswerCorrect?: boolean;
+}
+
+export interface QuizGameState {
+  round: number;
+  totalRounds: number;
+  snippetYoutubeId: string;
+  snippetStartSeconds: number;
+  options: QuizOption[];
+  correctOptionId: string | null; // Only populated when round ends
+  timeRemaining: number;
+  isRoundActive: boolean;
+  scores: Record<string, QuizScoreItem>;
+  winner?: QuizScoreItem;
+}
+
+export interface ClashParticipant {
+  userId: string;
+  userName: string;
+  avatar: string;
+  song?: {
+    youtubeId: string;
+    title: string;
+    artist: string;
+    thumbnail: string;
+  };
+  votes: number;
+}
+
+export interface ClashGameState {
+  player1: ClashParticipant;
+  player2: ClashParticipant;
+  stage: 'nominating' | 'battling' | 'finished';
+  currentBattlingPlayer?: 'player1' | 'player2';
+  timeRemaining: number;
+  userVotes: Record<string, 'player1' | 'player2'>;
+  winner?: 'player1' | 'player2' | 'tie';
+}
+
+export interface RouletteChallenge {
+  id: string;
+  title: string;
+  description: string;
+  category: 'vocal' | 'memory' | 'dedication' | 'punishment';
+  emoji: string;
+}
+
+export interface RouletteGameState {
+  isSpinning: boolean;
+  selectedUserId?: string;
+  selectedUserName?: string;
+  selectedUserAvatar?: string;
+  challenge?: RouletteChallenge;
+  spinTimestamp?: number;
+}
+
+export interface ActiveRoomGame {
+  type: MiniGameType;
+  quiz?: QuizGameState;
+  clash?: ClashGameState;
+  roulette?: RouletteGameState;
+}
+
 // Socket Events Definition
 export interface ServerToClientEvents {
   'room:sync': (state: RoomState) => void;
@@ -235,6 +315,9 @@ export interface ServerToClientEvents {
   'voice:userLeft': (socketId: string) => void;
   'voice:signal': (data: { fromSocketId: string; fromUserId: string; signal: any }) => void;
   'voice:muteChanged': (data: { socketId: string; isMuted: boolean }) => void;
+  // 🎮 Multiplayer Games events
+  'game:update': (game: ActiveRoomGame | null) => void;
+  'game:notification': (data: { title: string; message: string; emoji: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -252,6 +335,16 @@ export interface ClientToServerEvents {
   'voice:leave': () => void;
   'voice:signal': (payload: { targetSocketId: string; signal: any }) => void;
   'voice:mute': (isMuted: boolean) => void;
+  // 🎮 Multiplayer Games actions
+  'game:start': (
+    payload: { type: MiniGameType; opponentUserId?: string },
+    callback?: (response: { success: boolean; error?: string }) => void
+  ) => void;
+  'game:end': (callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'game:quizAnswer': (optionId: string) => void;
+  'game:clashNominate': (songQueryOrUrl: string) => void;
+  'game:clashVote': (choice: 'player1' | 'player2') => void;
+  'game:spinRoulette': () => void;
   'room:create': (
     payload: {
       roomName: string;

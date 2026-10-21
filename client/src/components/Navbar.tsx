@@ -10,9 +10,10 @@ import {
   Lock,
   QrCode,
   Sparkles,
-  Tv
+  Tv,
+  Gamepad2
 } from 'lucide-react';
-import type { RoomState, User, AuthUser } from '@mirocola/shared';
+import type { RoomState, User, AuthUser, ActiveRoomGame } from '@mirocola/shared';
 import type { ThemeConfig } from '../lib/theme';
 
 interface NavbarProps {
@@ -20,10 +21,12 @@ interface NavbarProps {
   currentUser: User | null;
   authUser?: AuthUser | null;
   theme?: ThemeConfig;
+  activeGame?: ActiveRoomGame | null;
   onOpenUsers: () => void;
   onOpenSettings?: () => void;
   onOpenQR?: () => void;
   onOpenTvMode?: () => void;
+  onOpenMiniGames?: () => void;
   onOpenAuth?: () => void;
   onOpenProfile?: () => void;
   onLeaveRoom: () => void;
@@ -34,10 +37,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   authUser,
   theme,
+  activeGame,
   onOpenUsers,
   onOpenSettings,
   onOpenQR,
   onOpenTvMode,
+  onOpenMiniGames,
   onOpenAuth,
   onOpenProfile,
   onLeaveRoom
@@ -131,6 +136,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Tv className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
                 <span className="text-xs font-bold hidden md:inline">Modo TV</span>
+              </button>
+            )}
+
+            {/* 🎮 Party Mini-games Button */}
+            {onOpenMiniGames && (
+              <button
+                onClick={onOpenMiniGames}
+                title="Juegos de Fiesta: Quiz Musical, Batalla de DJs y Ruleta Karaoke"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-md group relative ${
+                  activeGame
+                    ? 'bg-gradient-to-r from-amber-500 to-rose-600 border-amber-300 text-white animate-pulse shadow-amber-500/30'
+                    : 'bg-gradient-to-r from-indigo-950/80 via-purple-950/80 to-slate-900 hover:from-indigo-900 hover:to-purple-900 border-indigo-500/40 text-indigo-300 hover:text-white'
+                }`}
+              >
+                <Gamepad2 className="w-4 h-4 text-indigo-300 group-hover:scale-110 transition-transform" />
+                <span className="hidden md:inline">Minijuegos</span>
+                {activeGame ? (
+                  <span className="w-2 h-2 rounded-full bg-yellow-300 animate-ping" />
+                ) : (
+                  <span className="text-[10px] px-1 rounded bg-indigo-500/30 text-indigo-200">3</span>
+                )}
               </button>
             )}
 
@@ -275,6 +301,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="p-1.5 rounded-lg bg-gradient-to-r from-purple-950 to-pink-950 border border-pink-500/40 text-pink-400 active:bg-purple-900"
                 >
                   <Tv className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Minijuegos Mobile Button */}
+              {onOpenMiniGames && (
+                <button
+                  onClick={onOpenMiniGames}
+                  title="Minijuegos de Fiesta"
+                  className={`p-1.5 rounded-lg border text-indigo-300 active:scale-95 relative ${
+                    activeGame
+                      ? 'bg-gradient-to-r from-amber-500 to-rose-600 border-amber-300 text-white animate-pulse'
+                      : 'bg-indigo-950/80 border-indigo-500/40'
+                  }`}
+                >
+                  <Gamepad2 className="w-3.5 h-3.5" />
+                  {activeGame && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-yellow-300 animate-ping" />
+                  )}
                 </button>
               )}
 

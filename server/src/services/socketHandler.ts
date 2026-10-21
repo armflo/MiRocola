@@ -9,12 +9,14 @@ import {
 } from '@mirocola/shared';
 import { RoomManager } from './roomManager.js';
 import { YouTubeService } from './youtubeService.js';
+import { GameManager } from './gameManager.js';
 
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
 export function setupSocketHandlers(io: TypedServer) {
   const roomManager = RoomManager.getInstance();
+  const gameManager = GameManager.getInstance();
   const voiceRooms = new Map<string, Map<string, VoiceUser>>();
 
   // Background playback auto-advance & Auto-DJ broadcaster
@@ -46,6 +48,26 @@ export function setupSocketHandlers(io: TypedServer) {
     },
     (roomCode, message) => {
       io.to(roomCode).emit('room:closed', { reason: 'inactivity', message });
+    }
+  );
+
+  // Real-time mini-games callbacks
+  gameManager.setCallbacks(
+    (roomCode, game) => {
+      io.to(roomCode).emit('game:update', game);
+    },
+    (roomCode, data) => {
+      io.to(roomCode).emit('game:notification', data);
+    },
+    (roomCode, text) => {
+      const chatMsg: ChatMessage = {
+        id: `msg_game_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        user: { id: 'gamemaster', name: '🎮 MiRocola Games', avatar: '' },
+        text,
+        timestamp: Date.now(),
+        isSystem: true
+      };
+      io.to(roomCode).emit('chat:message', chatMsg);
     }
   );
 
@@ -98,6 +120,11 @@ export function setupSocketHandlers(io: TypedServer) {
         io.to(room.code).emit('users:update', room.users);
         io.to(room.code).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
 
+        const activeGame = gameManager.getGame(room.code);
+        if (activeGame) {
+          socket.emit('game:update', activeGame);
+        }
+
         const joinMsg: ChatMessage = {
           id: `msg_${Date.now()}`,
           user: { id: 'system', name: 'MiRocola', avatar: '' },
@@ -125,6 +152,11 @@ export function setupSocketHandlers(io: TypedServer) {
         socket.join(room.code);
         callback({ success: true, state: room });
         io.to(room.code).emit('users:update', room.users);
+
+        const activeGame = gameManager.getGame(room.code);
+        if (activeGame) {
+          socket.emit('game:update', activeGame);
+        }
       } catch (err: any) {
         callback({ success: false, error: err.message || 'La sala ya no está disponible' });
       }
@@ -532,6 +564,107 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
+    // 8.1 Multiplayer Mini-Games
+    socket.on('game:start', (payload, callback) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) throw new Error('No estás conectado a ninguna sala');
+        const room = roomManager.getRoom(session.roomCode);
+        if (!room) throw new Error('Sala no encontrada');
+
+        const user = room.users.find((u) => u.id === session.userId);
+        if (!user) throw new Error('Usuario no encontrado');
+
+        if (payload.type === 'quiz') {
+          gameManager.startQuiz(room.code, { id: user.id, name: user.name, avatar: user.avatar });
+        } else if (payload.type === 'clash') {
+          const opponent = payload.opponentUserId
+            ? room.users.find((u) => u.id === payload.opponentUserId)
+            : undefined;
+          gameManager.startClash(
+            room.code,
+            { id: user.id, name: user.name, avatar: user.avatar },
+            opponent ? { id: opponent.id, name: opponent.name, avatar: opponent.avatar } : undefined
+          );
+        } else if (payload.type === 'roulette') {
+          gameManager.spinRoulette(
+            room.code,
+            room.users.map((u) => ({ id: u.id, name: u.name, avatar: u.avatar }))
+          );
+        }
+
+        roomManager.recordActivity(room.code);
+        callback?.({ success: true });
+      } catch (err: any) {
+        callback?.({ success: false, error: err.message || 'Error al iniciar el minijuego' });
+      }
+    });
+
+    socket.on('game:end', (callback) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (session) {
+          gameManager.stopGame(session.roomCode);
+        }
+        callback?.({ success: true });
+      } catch (err: any) {
+        callback?.({ success: false, error: err.message });
+      }
+    });
+
+    socket.on('game:quizAnswer', (optionId) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        const room = roomManager.getRoom(session.roomCode);
+        if (!room) return;
+        const user = room.users.find((u) => u.id === session.userId);
+        if (!user) return;
+        gameManager.submitQuizAnswer(session.roomCode, { id: user.id, name: user.name, avatar: user.avatar }, optionId);
+        roomManager.recordActivity(session.roomCode);
+      } catch {
+        // Silent catch
+      }
+    });
+
+    socket.on('game:clashNominate', async (songQueryOrUrl) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        await gameManager.nominateClashSong(session.roomCode, session.userId, songQueryOrUrl);
+        roomManager.recordActivity(session.roomCode);
+      } catch {
+        // Silent catch
+      }
+    });
+
+    socket.on('game:clashVote', (choice) => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        gameManager.voteClash(session.roomCode, session.userId, choice);
+        roomManager.recordActivity(session.roomCode);
+      } catch {
+        // Silent catch
+      }
+    });
+
+    socket.on('game:spinRoulette', () => {
+      try {
+        const session = roomManager.getSession(socket.id);
+        if (!session) return;
+        const room = roomManager.getRoom(session.roomCode);
+        if (!room) return;
+        gameManager.spinRoulette(
+          room.code,
+          room.users.map((u) => ({ id: u.id, name: u.name, avatar: u.avatar }))
+        );
+        roomManager.recordActivity(session.roomCode);
+      } catch {
+        // Silent catch
+      }
+    });
+
     // 9. Disconnection
     socket.on('disconnect', () => {
       // Clean up voice connection if user was in voice
@@ -544,6 +677,9 @@ export function setupSocketHandlers(io: TypedServer) {
 
       const { room, disconnectedUser, newHost } = roomManager.handleDisconnect(socket.id);
       if (room && disconnectedUser) {
+        if (room.users.length === 0) {
+          gameManager.stopGame(room.code);
+        }
         io.to(room.code).emit('users:update', room.users);
         io.to(room.code).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
 
