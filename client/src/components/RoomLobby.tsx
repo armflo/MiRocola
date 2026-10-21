@@ -231,31 +231,31 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
           </div>
         )}
 
-        {/* Tab switcher */}
-        <div className="grid grid-cols-2 p-1 bg-slate-950/70 rounded-xl border border-purple-900/30 mb-6">
+        {/* Tab switcher: Clearly highlighting Create vs Join */}
+        <div className="grid grid-cols-2 p-1.5 bg-slate-950/80 rounded-2xl border border-purple-900/40 mb-6 shadow-inner gap-1">
           <button
             type="button"
             onClick={() => setTab('create')}
-            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               tab === 'create'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 text-white shadow-lg shadow-pink-600/30 scale-[1.02]'
+                : 'text-slate-400 hover:text-pink-300'
             }`}
           >
-            <Disc3 className="w-4 h-4" />
-            Crear Sala
+            <Sparkles className="w-4 h-4 text-pink-300" />
+            <span>Crear Sala ✨</span>
           </button>
           <button
             type="button"
             onClick={() => setTab('join')}
-            className={`py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               tab === 'join'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30 scale-[1.02]'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Users className="w-4 h-4" />
-            Unirme a Sala
+            <span>Unirme con Código</span>
           </button>
         </div>
 
@@ -411,25 +411,75 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
           )}
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading || !userName.trim() || (tab === 'join' && !roomCode.trim())}
-            className="w-full mt-2 py-3 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span className="text-xs">
-                  {slowConnecting ? 'Despertando servidor...' : 'Conectando...'}
-                </span>
-              </div>
-            ) : (
-              <>
-                <span>{tab === 'create' ? 'Crear Rocola' : 'Entrar a la Rocola'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
+          {tab === 'create' ? (
+            <button
+              type="submit"
+              disabled={isLoading || !userName.trim()}
+              className="w-full mt-3 py-3.5 px-4 rounded-xl font-black text-white bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-pink-500/30 border border-pink-400/40 flex items-center justify-center gap-2.5 transition-all cursor-pointer hover:scale-[1.02] active:scale-95 text-sm sm:text-base"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="text-sm">
+                    {slowConnecting ? 'Despertando servidor...' : 'Iniciando sala...'}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5 text-yellow-300 animate-spin" style={{ animationDuration: '3s' }} />
+                  <span>¡Crear Mi Sala de Música Ahora!</span>
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isLoading || !userName.trim() || !roomCode.trim()}
+              className="w-full mt-3 py-3.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/30 border border-purple-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.01] active:scale-95 text-sm"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="text-sm">
+                    {slowConnecting ? 'Despertando servidor...' : 'Entrando a sala...'}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <span>Entrar a la Sala con Código</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Quick-switch footer for optimal UX */}
+          {tab === 'join' ? (
+            <div className="mt-4 pt-3.5 border-t border-purple-900/40 text-center">
+              <p className="text-[11px] text-slate-400 mb-2">
+                ¿Quieres poner tu propia música e invitar amigos?
+              </p>
+              <button
+                type="button"
+                onClick={() => setTab('create')}
+                className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs text-pink-300 hover:text-white bg-purple-950/70 hover:bg-gradient-to-r hover:from-pink-600/30 hover:to-purple-600/30 border border-pink-500/40 hover:border-pink-400 shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 group"
+              >
+                <Disc3 className="w-4 h-4 text-pink-400 group-hover:rotate-90 transition-transform" />
+                <span>✨ Crear Mi Propia Sala Gratis Aquí</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => setTab('join')}
+                className="text-xs text-purple-300 hover:text-pink-300 underline font-medium cursor-pointer transition-colors"
+              >
+                ¿Ya tienes el código de un amigo? Unirse con código aquí
+              </button>
+            </div>
+          )}
 
           {slowConnecting && (
             <p className="text-[11px] text-amber-300 text-center animate-pulse leading-snug px-2">

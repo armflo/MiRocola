@@ -1,7 +1,10 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" style="background-color: #020617; color: #f8fafc;">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ec4899' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><circle cx='12' cy='12' r='3'/><path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MiRocola — Salas de Música Colaborativa en Vivo</title>
@@ -19,8 +22,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-slate-950 font-['Plus_Jakarta_Sans',sans-serif]">
-    <div id="root"></div>
+  <body class="bg-slate-950 font-['Plus_Jakarta_Sans',sans-serif]" style="background-color: #020617; margin: 0; min-height: 100vh;">
+    <div id="root">
+      <!-- Fallback pre-render loader while React bundle mounts -->
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617; color: #cbd5e1; font-family: sans-serif;">
+        <div style="width: 48px; height: 48px; border: 3px solid rgba(236,72,153,0.2); border-top-color: #ec4899; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <p style="margin-top: 16px; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; color: #e2e8f0;">Iniciando MiRocola...</p>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
