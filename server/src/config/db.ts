@@ -26,13 +26,23 @@ function formatDatabaseUrl(rawUrl?: string): string | undefined {
     url = `${url}${separator}sslaccept=strict`;
   }
 
+  // TiDB Cloud / MySQL: Prevent connecting to system databases (sys, mysql, information_schema, performance_schema)
+  // or empty database path, which causes Code 1142: "CREATE command denied to user for table 'user'"
+  // and Prisma Error P3004: "The `sys` database is a system database, it should not be altered with prisma migrate."
+  // Automatically reroute to user database 'test' which is default in all TiDB clusters with full permissions.
+  url = url.replace(/\/sys(\?|$)/i, '/test$1');
+  url = url.replace(/\/information_schema(\?|$)/i, '/test$1');
+  url = url.replace(/\/performance_schema(\?|$)/i, '/test$1');
+  url = url.replace(/\/mysql(\?|$)/i, '/test$1');
+  url = url.replace(/(:\d+)\/(\?|$)/, '$1/test$2');
+
   return url;
 }
 
 const formattedDbUrl = formatDatabaseUrl(process.env.DATABASE_URL);
 if (formattedDbUrl && formattedDbUrl !== process.env.DATABASE_URL) {
   process.env.DATABASE_URL = formattedDbUrl;
-  console.log('🔒 Enhanced DATABASE_URL with sslaccept=strict for secure cloud transport.');
+  console.log('🔒 Enhanced DATABASE_URL with user database (/test) and sslaccept=strict for TiDB Cloud.');
 }
 
 export const prisma = new PrismaClient(

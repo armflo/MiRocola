@@ -10,6 +10,9 @@ function formatAuthError(err: any): string {
   if (msg.includes('insecure transport') || msg.includes('1105')) {
     return 'La base de datos en la nube (TiDB Cloud) requiere SSL. Asegúrate de añadir "?sslaccept=strict" al final de tu variable DATABASE_URL en Render.';
   }
+  if (msg.includes('1142') || msg.includes('command denied') || msg.includes('P3004')) {
+    return 'La base de datos apuntaba al esquema de sistema (sys). El servidor la redirigió automáticamente a la base de datos de usuario. Por favor intenta de nuevo.';
+  }
   if (
     msg.includes("doesn't exist") ||
     msg.includes('does not exist') ||
