@@ -21,7 +21,8 @@ import {
   Minimize2,
   X,
   Smartphone,
-  Music
+  Music,
+  RefreshCw
 } from 'lucide-react';
 import type {
   PlaybackState,
@@ -32,6 +33,7 @@ import type {
   ReactionEvent,
   SoundboardEvent
 } from '@mirocola/shared';
+import { socket } from '../services/socket';
 import { formatTime } from '../lib/utils';
 import { SOUND_EFFECTS } from '../lib/soundboard';
 import { AudioVisualizer } from './AudioVisualizer';
@@ -135,14 +137,55 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
     message: string;
     countdown: number;
   } | null>(null);
+  const [isSearchingFallback, setIsSearchingFallback] = useState(false);
+  const [fallbackStatus, setFallbackStatus] = useState<string | null>(null);
 
   const canControl = roomMode === 'COLLABORATIVE' || isHost;
   const currentSong = playback.currentSong;
   const hasVotedSkip = currentUser ? skipVotes.includes(currentUser.id) : false;
 
+  const handleFindAlternative = (songToReplace: Song) => {
+    if (isSearchingFallback) return;
+    setIsSearchingFallback(true);
+    setFallbackStatus('Buscando versión de audio o karaoke sin restricciones...');
+
+    const cleanTitle = songToReplace.title
+      .replace(/(\[.*?\]|\(.*?\)|official\s+video|video\s+oficial|videoclip|audio\s+oficial)/gi, '')
+      .trim();
+    const query = `${cleanTitle} audio`;
+
+    socket.emit('youtube:search', query, (res) => {
+      if (res.success && res.results && res.results.length > 0) {
+        const alt = res.results.find((r) => r.youtubeId !== songToReplace.youtubeId) || res.results[0];
+        if (alt && alt.youtubeId !== songToReplace.youtubeId) {
+          setFallbackStatus(`¡Versión alternativa encontrada! Reemplazando por "${alt.title}"...`);
+          socket.emit(
+            'playback:fallbackSong',
+            {
+              alternativeYoutubeId: alt.youtubeId,
+              title: alt.title,
+              channelTitle: alt.channelTitle,
+              duration: alt.durationSeconds,
+              thumbnail: alt.thumbnail
+            },
+            () => {
+              setIsSearchingFallback(false);
+              setPlaybackError(null);
+              setFallbackStatus(null);
+            }
+          );
+          return;
+        }
+      }
+      setFallbackStatus('No se encontró una versión alternativa automática. Puedes saltar la canción.');
+      setIsSearchingFallback(false);
+    });
+  };
+
   // Clear playback error when current song changes
   useEffect(() => {
     setPlaybackError(null);
+    setFallbackStatus(null);
   }, [currentSong?.youtubeId]);
 
   // Countdown timer for automatic skipping of unplayable videos
@@ -216,7 +259,10 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
             if (code === 101 || code === 150) {
               title = 'Incrustación Bloqueada por Copyright';
               message =
-                'El autor o la discográfica (ej. LatinAutor / UMPG / Sony) ha bloqueado la reproducción de este video fuera de YouTube.';
+                'La discográfica ha bloqueado la reproducción de este videoclip oficial fuera de YouTube. Buscando automáticamente una versión alternativa de audio/karaoke compatible...';
+              if (currentSong) {
+                handleFindAlternative(currentSong);
+              }
             } else if (code === 100) {
               title = 'Video no encontrado o privado';
               message = 'El video fue eliminado o marcado como privado por su autor.';
@@ -309,7 +355,7 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
           });
         }
       }
-    }, 500);
+    }, 100);
 
     return () => clearInterval(timer);
   }, [isPlayerReady, currentSong, roomSettings?.maxSongDurationSeconds, playbackError]);
@@ -847,12 +893,35 @@ export const YouTubeSyncPlayer: React.FC<YouTubeSyncPlayerProps> = ({
               {playbackError.message}
             </p>
 
-            <p className="text-[11px] text-slate-400 mb-5 truncate max-w-sm">
+            <p className="text-[11px] text-slate-400 mb-3 truncate max-w-sm">
               Canción: <span className="font-semibold text-slate-200">{currentSong.title}</span>
             </p>
 
+            {fallbackStatus && (
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-950/90 border border-purple-500/50 text-xs text-purple-200 mb-4 max-w-md shadow-md animate-pulse">
+                <RefreshCw
+                  className={`w-4 h-4 text-pink-400 flex-shrink-0 ${
+                    isSearchingFallback ? 'animate-spin' : ''
+                  }`}
+                />
+                <span className="truncate">{fallbackStatus}</span>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex items-center gap-3 flex-wrap justify-center">
+              {(playbackError.code === 101 || playbackError.code === 150) && (
+                <button
+                  onClick={() => handleFindAlternative(currentSong)}
+                  disabled={isSearchingFallback}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-xs text-white shadow-lg shadow-pink-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+                  title="Buscar y reproducir automáticamente una versión oficial de audio o karaoke"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSearchingFallback ? 'animate-spin' : ''}`} />
+                  <span>{isSearchingFallback ? 'Buscando audio...' : 'Reemplazar con Audio Oficial'}</span>
+                </button>
+              )}
+
               {canControl ? (
                 <button
                   onClick={onNext}

@@ -212,6 +212,35 @@ export function setupSocketHandlers(io: TypedServer) {
       }
     });
 
+    socket.on('playback:fallbackSong', (payload, callback) => {
+      try {
+        const { roomCode } = getSession();
+        const room = roomManager.replaceCurrentSong(roomCode, {
+          youtubeId: payload.alternativeYoutubeId,
+          title: payload.title,
+          channelTitle: payload.channelTitle,
+          durationSeconds: payload.duration,
+          thumbnail: payload.thumbnail
+        });
+
+        io.to(roomCode).emit('playback:sync', room.playback);
+        io.to(roomCode).emit('skip:update', room.skipVotes, room.requiredSkipVotes);
+
+        const noticeMsg: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          user: { id: 'system', name: '🛡️ Anti-Bloqueo', avatar: '' },
+          text: `🔄 Video con bloqueo de incrustación reemplazado automáticamente por versión alternativa compatible: "${room.playback.currentSong?.title}".`,
+          timestamp: Date.now(),
+          isSystem: true
+        };
+        io.to(roomCode).emit('chat:message', noticeMsg);
+
+        if (callback) callback({ success: true });
+      } catch (err: any) {
+        if (callback) callback({ success: false, error: err.message });
+      }
+    });
+
     // 4. Queue Management
     socket.on('queue:add', async (urlOrQuery, callback) => {
       try {

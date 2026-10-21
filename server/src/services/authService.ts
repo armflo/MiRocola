@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../config/db.js';
+import { prisma, withAutoTableRecovery } from '../config/db.js';
 import type {
   AuthUser,
   RegisterPayload,
@@ -58,40 +58,42 @@ export class AuthService {
       throw new Error('La contraseña debe tener al menos 6 caracteres.');
     }
 
-    // Check if email already registered
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingEmail) {
-      throw new Error('Este correo electrónico ya está registrado.');
-    }
-
-    // Check if username already taken
-    const existingUser = await prisma.user.findUnique({ where: { username } });
-    if (existingUser) {
-      throw new Error('Este nombre de usuario ya está en uso. Por favor elige otro.');
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const avatar =
-      payload.avatar?.trim() ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
-
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        username,
-        passwordHash,
-        avatar,
-        bio: payload.bio?.trim() || '¡Amante de la buena música en MiRocola!',
-        djScore: 50 // Welcome bonus!
+    return await withAutoTableRecovery(async () => {
+      // Check if email already registered
+      const existingEmail = await prisma.user.findUnique({ where: { email } });
+      if (existingEmail) {
+        throw new Error('Este correo electrónico ya está registrado.');
       }
+
+      // Check if username already taken
+      const existingUser = await prisma.user.findUnique({ where: { username } });
+      if (existingUser) {
+        throw new Error('Este nombre de usuario ya está en uso. Por favor elige otro.');
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const avatar =
+        payload.avatar?.trim() ||
+        `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
+
+      const newUser = await prisma.user.create({
+        data: {
+          email,
+          username,
+          passwordHash,
+          avatar,
+          bio: payload.bio?.trim() || '¡Amante de la buena música en MiRocola!',
+          djScore: 50 // Welcome bonus!
+        }
+      });
+
+      const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '30d' });
+
+      return {
+        user: this.formatUser(newUser),
+        token
+      };
     });
-
-    const token = jwt.sign({ userId: newUser.id }, JWT_SECRET, { expiresIn: '30d' });
-
-    return {
-      user: this.formatUser(newUser),
-      token
-    };
   }
 
   /**
@@ -105,39 +107,43 @@ export class AuthService {
       throw new Error('Ingresa tu usuario/correo y contraseña.');
     }
 
-    // Find by email or username
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: identifier }, { username: identifier }]
+    return await withAutoTableRecovery(async () => {
+      // Find by email or username
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: identifier }, { username: identifier }]
+        }
+      });
+
+      if (!user) {
+        throw new Error('Credenciales incorrectas. Verifica tu usuario o contraseña.');
       }
+
+      const isMatch = await bcrypt.compare(password, user.passwordHash);
+      if (!isMatch) {
+        throw new Error('Credenciales incorrectas. Verifica tu usuario o contraseña.');
+      }
+
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+
+      return {
+        user: this.formatUser(user),
+        token
+      };
     });
-
-    if (!user) {
-      throw new Error('Credenciales incorrectas. Verifica tu usuario o contraseña.');
-    }
-
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      throw new Error('Credenciales incorrectas. Verifica tu usuario o contraseña.');
-    }
-
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-
-    return {
-      user: this.formatUser(user),
-      token
-    };
   }
 
   /**
    * Get user profile by ID from token
    */
   static async getUserById(userId: number): Promise<AuthUser> {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new Error('Usuario no encontrado.');
-    }
-    return this.formatUser(user);
+    return await withAutoTableRecovery(async () => {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new Error('Usuario no encontrado.');
+      }
+      return this.formatUser(user);
+    });
   }
 
   /**
@@ -145,35 +151,37 @@ export class AuthService {
    */
   static async getPublicProfile(username: string) {
     const cleanUser = username.trim().toLowerCase();
-    const user = await prisma.user.findUnique({
-      where: { username: cleanUser },
-      include: {
-        playlists: {
-          where: { isPublic: true },
-          include: {
-            songs: { take: 4 }
-          },
-          orderBy: { createdAt: 'desc' }
+    return await withAutoTableRecovery(async () => {
+      const user = await prisma.user.findUnique({
+        where: { username: cleanUser },
+        include: {
+          playlists: {
+            where: { isPublic: true },
+            include: {
+              songs: { take: 4 }
+            },
+            orderBy: { createdAt: 'desc' }
+          }
         }
+      });
+
+      if (!user) {
+        throw new Error('Perfil no encontrado.');
       }
+
+      return {
+        user: this.formatUser(user),
+        playlists: user.playlists.map((p) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          slug: p.slug,
+          likesCount: p.likesCount,
+          songsCount: p.songs.length,
+          createdAt: p.createdAt.toISOString()
+        }))
+      };
     });
-
-    if (!user) {
-      throw new Error('Perfil no encontrado.');
-    }
-
-    return {
-      user: this.formatUser(user),
-      playlists: user.playlists.map((p) => ({
-        id: p.id,
-        title: p.title,
-        description: p.description,
-        slug: p.slug,
-        likesCount: p.likesCount,
-        songsCount: p.songs.length,
-        createdAt: p.createdAt.toISOString()
-      }))
-    };
   }
 
   /**

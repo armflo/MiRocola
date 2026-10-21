@@ -1,6 +1,7 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/authService.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/authMiddleware.js';
+import { ensureTablesExist } from '../config/db.js';
 
 export const authRouter = Router();
 
@@ -9,14 +10,40 @@ function formatAuthError(err: any): string {
   if (msg.includes('insecure transport') || msg.includes('1105')) {
     return 'La base de datos en la nube (TiDB Cloud) requiere SSL. Asegúrate de añadir "?sslaccept=strict" al final de tu variable DATABASE_URL en Render.';
   }
-  if (msg.includes("doesn't exist") || msg.includes('P2021')) {
-    return 'Las tablas de la base de datos aún no se han creado. Revisa el despliegue de Render.';
+  if (
+    msg.includes("doesn't exist") ||
+    msg.includes('does not exist') ||
+    msg.includes('P2021') ||
+    err?.code === 'P2021'
+  ) {
+    return 'Las tablas de la base de datos se están inicializando. Por favor intenta de nuevo en 3 segundos.';
   }
-  if (msg.includes("Can't reach database server") || msg.includes('P1001')) {
+  if (msg.includes("Can't reach database server") || msg.includes('P1001') || err?.code === 'P1001') {
     return 'No se pudo conectar al servidor de base de datos. Revisa las credenciales de Render.';
   }
   return msg || 'Error en la autenticación';
 }
+
+/**
+ * GET or POST /api/db/init - Trigger database auto-migration/table provisioning
+ */
+authRouter.all('/db/init', async (_req: Request, res: Response) => {
+  try {
+    const result = await ensureTablesExist();
+    return res.json({
+      success: result.success,
+      message: result.success
+        ? 'Todas las tablas de la base de datos fueron creadas o verificadas exitosamente.'
+        : 'Algunas tablas tuvieron advertencias al crearse.',
+      errors: result.errors
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || String(err)
+    });
+  }
+});
 
 /**
  * POST /api/auth/register

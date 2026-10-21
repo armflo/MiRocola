@@ -585,6 +585,42 @@ export class RoomManager {
   }
 
   /**
+   * Replaces current song with an alternative compatible YouTube video
+   * (e.g. When official video is blocked by record label copyright on embeds)
+   */
+  public replaceCurrentSong(
+    code: string,
+    newSongData: {
+      youtubeId: string;
+      title?: string;
+      channelTitle?: string;
+      durationSeconds?: number;
+      thumbnail?: string;
+    }
+  ): RoomState {
+    const room = this.getRoom(code);
+    if (!room) throw new Error('Sala no encontrada');
+    if (!room.playback.currentSong) throw new Error('No hay canción activa para reemplazar');
+
+    room.playback.currentSong = {
+      ...room.playback.currentSong,
+      youtubeId: newSongData.youtubeId,
+      title: newSongData.title || room.playback.currentSong.title,
+      channelTitle: newSongData.channelTitle || room.playback.currentSong.channelTitle,
+      durationSeconds: newSongData.durationSeconds || room.playback.currentSong.durationSeconds,
+      thumbnail: newSongData.thumbnail || room.playback.currentSong.thumbnail,
+      url: `https://www.youtube.com/watch?v=${newSongData.youtubeId}`
+    };
+    room.playback.currentTime = 0;
+    room.playback.timestamp = Date.now();
+    room.playback.isPlaying = true;
+    room.skipVotes = [];
+
+    this.recordActivity(code);
+    return room;
+  }
+
+  /**
    * Update duration reported by the client's player if duration was unknown
    */
   public updateCurrentSongDuration(code: string, duration: number) {

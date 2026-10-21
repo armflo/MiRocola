@@ -46,34 +46,42 @@ export const prisma = new PrismaClient(
 /**
  * Automatically creates all schema tables if they don't exist yet
  */
-async function ensureTablesExist() {
+export async function ensureTablesExist(): Promise<{ success: boolean; errors: string[] }> {
+  console.log('⚡ Initializing database schema tables if not present...');
+  const errors: string[] = [];
+
   const tableDefinitions = [
     `CREATE TABLE IF NOT EXISTS \`User\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-      \`email\` VARCHAR(191) NOT NULL UNIQUE,
-      \`username\` VARCHAR(191) NOT NULL UNIQUE,
-      \`passwordHash\` VARCHAR(255) NOT NULL,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
+      \`email\` VARCHAR(191) NOT NULL,
+      \`username\` VARCHAR(191) NOT NULL,
+      \`passwordHash\` VARCHAR(191) NOT NULL,
       \`avatar\` VARCHAR(500) NOT NULL,
       \`bio\` VARCHAR(500) NULL,
       \`djScore\` INT NOT NULL DEFAULT 0,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      UNIQUE INDEX \`User_email_key\` (\`email\`),
+      UNIQUE INDEX \`User_username_key\` (\`username\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`Room\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-      \`code\` VARCHAR(191) NOT NULL UNIQUE,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
+      \`code\` VARCHAR(191) NOT NULL,
       \`name\` VARCHAR(191) NOT NULL,
       \`mode\` VARCHAR(191) NOT NULL DEFAULT 'COLLABORATIVE',
       \`hostName\` VARCHAR(191) NOT NULL,
       \`hostUserId\` INT NULL,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      INDEX \`idx_room_code\` (\`code\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      UNIQUE INDEX \`Room_code_key\` (\`code\`),
+      INDEX \`Room_code_idx\` (\`code\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`SongHistory\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
       \`roomId\` INT NOT NULL,
       \`youtubeId\` VARCHAR(191) NOT NULL,
       \`title\` VARCHAR(500) NOT NULL,
@@ -81,55 +89,94 @@ async function ensureTablesExist() {
       \`duration\` INT NOT NULL,
       \`thumbnail\` VARCHAR(500) NOT NULL,
       \`addedBy\` VARCHAR(191) NOT NULL,
-      \`playedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      \`addedByUserId\` INT NULL,
+      \`playedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      INDEX \`SongHistory_roomId_idx\` (\`roomId\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`Playlist\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
       \`userId\` INT NOT NULL,
-      \`title\` VARCHAR(191) NOT NULL,
-      \`description\` VARCHAR(500) NULL,
-      \`slug\` VARCHAR(191) NOT NULL UNIQUE,
+      \`title\` VARCHAR(255) NOT NULL,
+      \`description\` VARCHAR(1000) NULL,
+      \`slug\` VARCHAR(191) NOT NULL,
       \`isPublic\` BOOLEAN NOT NULL DEFAULT true,
+      \`likesCount\` INT NOT NULL DEFAULT 0,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      UNIQUE INDEX \`Playlist_slug_key\` (\`slug\`),
+      INDEX \`Playlist_userId_idx\` (\`userId\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`PlaylistSong\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
       \`playlistId\` INT NOT NULL,
       \`youtubeId\` VARCHAR(191) NOT NULL,
       \`title\` VARCHAR(500) NOT NULL,
       \`channelTitle\` VARCHAR(255) NOT NULL,
       \`duration\` INT NOT NULL,
       \`thumbnail\` VARCHAR(500) NOT NULL,
-      \`position\` INT NOT NULL,
-      \`addedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      \`orderIndex\` INT NOT NULL DEFAULT 0,
+      \`addedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      INDEX \`PlaylistSong_playlistId_idx\` (\`playlistId\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`Comment\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-      \`playlistId\` INT NOT NULL,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
       \`userId\` INT NOT NULL,
+      \`playlistId\` INT NOT NULL,
       \`content\` VARCHAR(1000) NOT NULL,
-      \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+      \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      INDEX \`Comment_playlistId_idx\` (\`playlistId\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
 
     `CREATE TABLE IF NOT EXISTS \`PlaylistLike\` (
-      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-      \`playlistId\` INT NOT NULL,
+      \`id\` INT NOT NULL AUTO_INCREMENT,
       \`userId\` INT NOT NULL,
+      \`playlistId\` INT NOT NULL,
       \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      UNIQUE KEY \`unique_playlist_user\` (\`playlistId\`, \`userId\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
+      UNIQUE INDEX \`PlaylistLike_userId_playlistId_key\` (\`userId\`, \`playlistId\`),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
   ];
 
   for (const sql of tableDefinitions) {
     try {
       await prisma.$executeRawUnsafe(sql);
     } catch (err: any) {
-      console.warn('Notice executing table setup SQL:', err?.message || err);
+      console.error('Error executing table definition SQL:', err?.message || err);
+      errors.push(err?.message || String(err));
     }
+  }
+
+  return { success: errors.length === 0, errors };
+}
+
+/**
+ * Resilient wrapper: If a table is missing, auto-provisions schema and retries once
+ */
+export async function withAutoTableRecovery<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (err: any) {
+    const msg = err?.message || '';
+    if (
+      msg.includes("doesn't exist") ||
+      msg.includes('does not exist') ||
+      msg.includes('1146') ||
+      msg.includes('P2021') ||
+      err?.code === 'P2021'
+    ) {
+      console.log('⚡ Missing table detected during query. Auto-provisioning tables...');
+      await ensureTablesExist();
+      // Retry once after provisioning
+      return await action();
+    }
+    throw err;
   }
 }
 
@@ -138,24 +185,10 @@ export async function connectDB() {
     await prisma.$connect();
     console.log('✅ Connected to MySQL database via Prisma');
 
-    // Verify if tables exist, or create them automatically
-    try {
-      await prisma.$queryRawUnsafe('SELECT 1 FROM `User` LIMIT 1');
-      console.log('✅ Database schema verified: User table exists.');
-    } catch (checkErr: any) {
-      const msg = checkErr?.message || '';
-      if (
-        msg.includes("doesn't exist") ||
-        msg.includes('does not exist') ||
-        msg.includes('1146') ||
-        msg.includes('P2021')
-      ) {
-        console.log('⚡ Table User does not exist. Initializing database tables automatically...');
-        await ensureTablesExist();
-        console.log('✅ All database tables created successfully!');
-      }
-    }
+    // Run table initialization unconditionally to guarantee all tables exist
+    await ensureTablesExist();
+    console.log('✅ Database schema verified and tables ensured.');
   } catch (error) {
-    console.error('❌ Failed to connect to MySQL database:', error);
+    console.error('❌ Failed to connect to MySQL database during startup:', error);
   }
 }

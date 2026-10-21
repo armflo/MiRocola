@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Mic2, X, Music, Loader2, Sparkles } from 'lucide-react';
+import { Mic2, X, Music, Loader2, Sparkles, SlidersHorizontal, RotateCcw } from 'lucide-react';
 import { LyricsService, type LyricLine, type LyricsResult } from '../services/lyricsService';
 import { AudioVisualizer } from './AudioVisualizer';
 
@@ -27,6 +27,9 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
   const [lyricsData, setLyricsData] = useState<LyricsResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeLineIdx, setActiveLineIdx] = useState<number>(-1);
+  // Default anticipation lead of +0.3s allows singer's brain to read before uttering
+  const [timeOffset, setTimeOffset] = useState<number>(0.3);
+  const [showCalibrator, setShowCalibrator] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const activeLineRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,6 +39,7 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
     setIsLoading(true);
     setLyricsData(null);
     setActiveLineIdx(-1);
+    setTimeOffset(0.3); // Reset to default anticipation lead for new song
 
     LyricsService.getLyrics(title, channelTitle, durationSeconds)
       .then((res) => {
@@ -56,15 +60,16 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
     };
   }, [title, channelTitle, durationSeconds]);
 
-  // Update active line based on currentTime
+  // Update active line based on currentTime + timeOffset
   useEffect(() => {
     if (!lyricsData?.syncedLyrics || lyricsData.syncedLyrics.length === 0) return;
 
     const lines = lyricsData.syncedLyrics;
     let currentIdx = -1;
+    const effectiveTime = currentTime + timeOffset;
 
     for (let i = 0; i < lines.length; i++) {
-      if (currentTime >= lines[i].time) {
+      if (effectiveTime >= lines[i].time) {
         currentIdx = i;
       } else {
         break;
@@ -74,7 +79,7 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
     if (currentIdx !== activeLineIdx) {
       setActiveLineIdx(currentIdx);
     }
-  }, [currentTime, lyricsData, activeLineIdx]);
+  }, [currentTime, timeOffset, lyricsData, activeLineIdx]);
 
   // Smooth auto-scroll active line into center
   useEffect(() => {
@@ -98,9 +103,9 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
       </div>
 
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between pb-3 border-b border-purple-900/40 mb-3">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-purple-900/40 mb-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/30">
+          <div className="p-2 rounded-xl bg-gradient-to-tr from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/30 flex-shrink-0">
             <Mic2 className="w-5 h-5 animate-pulse" />
           </div>
           <div className="min-w-0">
@@ -120,14 +125,57 @@ export const KaraokeLyrics: React.FC<KaraokeLyricsProps> = ({
           </div>
         </div>
 
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+        {/* Controls: Calibration offset & Close */}
+        <div className="flex items-center gap-2 ml-auto">
+          {lyricsData?.syncedLyrics && (
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-purple-800/60 rounded-xl px-2 py-1 shadow-sm text-xs">
+              <button
+                onClick={() => setShowCalibrator(!showCalibrator)}
+                className="text-[11px] font-semibold text-purple-300 hover:text-white flex items-center gap-1 cursor-pointer"
+                title="Ajustar sincronización fina"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-pink-400" />
+                <span className="hidden sm:inline">Sincro:</span>
+                <span className="font-mono text-pink-300">
+                  {timeOffset >= 0 ? `+${timeOffset.toFixed(2)}s` : `${timeOffset.toFixed(2)}s`}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-1 pl-1 border-l border-slate-700/60">
+                <button
+                  onClick={() => setTimeOffset((prev) => Math.round((prev - 0.25) * 100) / 100)}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white active:scale-95 text-[10px] font-bold"
+                  title="Atrasar letra 0.25 segundos"
+                >
+                  -0.25s
+                </button>
+                <button
+                  onClick={() => setTimeOffset(0.3)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-pink-300 active:scale-95"
+                  title="Reiniciar calibración (+0.30s)"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                </button>
+                <button
+                  onClick={() => setTimeOffset((prev) => Math.round((prev + 0.25) * 100) / 100)}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white active:scale-95 text-[10px] font-bold"
+                  title="Adelantar letra 0.25 segundos"
+                >
+                  +0.25s
+                </button>
+              </div>
+            </div>
+          )}
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Content Area */}

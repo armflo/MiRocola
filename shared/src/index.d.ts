@@ -260,6 +260,16 @@ export interface ClientToServerEvents {
     'playback:pause': (currentTime?: number) => void;
     'playback:seek': (time: number) => void;
     'playback:next': () => void;
+    'playback:fallbackSong': (payload: {
+        alternativeYoutubeId: string;
+        title?: string;
+        channelTitle?: string;
+        duration?: number;
+        thumbnail?: string;
+    }, callback?: (response: {
+        success: boolean;
+        error?: string;
+    }) => void) => void;
     'queue:add': (urlOrQuery: string, callback: (response: {
         success: boolean;
         song?: Song;
